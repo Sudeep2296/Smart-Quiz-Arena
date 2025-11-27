@@ -1,0 +1,265 @@
+Easy Challenges
+Sum of Two Numbers
+
+Description: Given two integers a and b, print their sum.
+Difficulty: Easy
+Time Limit: 5 seconds
+Language: Python
+Reference Solution:
+
+a, b = map(int, input().split())
+print(a + b)
+Test Cases:
+Input: 5 7 → Output: 12
+Input: 0 0 → Output: 0
+Input: -1 1 → Output: 0
+Input: 100 200 → Output: 300
+Sample I/O: Input: 5 7, Output: 12
+Count Vowels in a String
+
+Description: Given a lowercase string s, count the number of vowels (a, e, i, o, u).
+Difficulty: Easy
+Time Limit: 5 seconds
+Language: Python
+Reference Solution:
+
+s = input().strip()
+vowels = set("aeiou")
+count = sum(1 for ch in s if ch in vowels)
+print(count)
+Test Cases:
+Input: hello world → Output: 3
+Input: aeiou → Output: 5
+Input: xyz → Output: 0
+Input: programming → Output: 3
+Sample I/O: Input: hello world, Output: 3
+Maximum of N Numbers
+
+Description: Given n and an array of n integers, print the maximum element.
+Difficulty: Easy
+Time Limit: 5 seconds
+Language: Python
+Reference Solution:
+
+n = int(input())
+arr = list(map(int, input().split()))
+print(max(arr))
+Test Cases:
+Input: 5\n1 7 3 9 2 → Output: 9
+Input: 3\n-1 -2 -3 → Output: -1
+Input: 1\n42 → Output: 42
+Input: 4\n10 20 30 40 → Output: 40
+Sample I/O: Input: 5\n1 7 3 9 2, Output: 9
+Reverse a String
+
+Description: Given a string s, print its reverse.
+Difficulty: Easy
+Time Limit: 5 seconds
+Language: Python
+Reference Solution:
+
+s = input()
+print(s[::-1])
+Test Cases:
+Input: code battle → Output: elttab edoc
+Input: hello → Output: olleh
+Input: a → Output: a
+Input: 12345 → Output: 54321
+Sample I/O: Input: code battle, Output: elttab edoc
+Factorial of N
+
+Description: Given integer n (0 ≤ n ≤ 12), print n!.
+Difficulty: Easy
+Time Limit: 5 seconds
+Language: Python
+Reference Solution:
+
+n = int(input())
+fact = 1
+for i in range(2, n+1):
+    fact *= i
+print(fact)
+Test Cases:
+Input: 5 → Output: 120
+Input: 0 → Output: 1
+Input: 1 → Output: 1
+Input: 3 → Output: 6
+Sample I/O: Input: 5, Output: 120
+Medium Challenges
+Two Sum
+
+Description: Given an array of n integers and an integer k, determine if there exists a pair of elements whose sum equals k. Print "YES" or "NO".
+Difficulty: Medium
+Time Limit: 10 seconds
+Language: Python
+Reference Solution:
+
+n = int(input())
+arr = list(map(int, input().split()))
+k = int(input())
+seen = set()
+found = False
+for x in arr:
+    if k - x in seen:
+        found = True
+        break
+    seen.add(x)
+print("YES" if found else "NO")
+Test Cases:
+Input: 5\n1 4 3 2 9\n6 → Output: YES
+Input: 3\n1 2 3\n10 → Output: NO
+Input: 4\n-1 0 1 2\n0 → Output: YES
+Input: 2\n5 5\n10 → Output: YES
+Sample I/O: Input: 5\n1 4 3 2 9\n6, Output: YES
+Balanced Parentheses
+
+Description: Given a string containing only '(', ')', '{', '}', '[', ']', determine if it is balanced.
+Difficulty: Medium
+Time Limit: 10 seconds
+Language: Python
+Reference Solution:
+
+s = input().strip()
+stack = []
+pairs = {")": "(", "]": "[", "}": "{"}
+balanced = True
+for ch in s:
+    if ch in "([{":
+        stack.append(ch)
+    else:
+        if not stack or stack[-1] != pairs.get(ch, None):
+            balanced = False
+            break
+        stack.pop()
+if stack:
+    balanced = False
+print("YES" if balanced else "NO")
+Test Cases:
+Input: {[()]} → Output: YES
+Input: ([)] → Output: NO
+Input: ((())) → Output: YES
+Input: {[}] → Output: NO
+Sample I/O: Input: {[()]}, Output: YES
+Matrix Transpose
+
+Description: Given a matrix of size n x m, print its transpose (m x n).
+Difficulty: Medium
+Time Limit: 10 seconds
+Language: Python
+Reference Solution:
+
+n, m = map(int, input().split())
+mat = [list(map(int, input().split())) for _ in range(n)]
+for j in range(m):
+    row = [mat[i][j] for i in range(n)]
+    print(*row)
+Test Cases:
+Input: 2 3\n1 2 3\n4 5 6 → Output: 1 4\n2 5\n3 6
+Input: 1 1\n42 → Output: 42
+Input: 3 2\n1 2\n3 4\n5 6 → Output: 1 3 5\n2 4 6
+Sample I/O: Input: 2 3\n1 2 3\n4 5 6, Output: 1 4\n2 5\n3 6
+Longest Word in a Sentence
+
+Description: Given a sentence, find the longest word. If multiple have same max length, print the first.
+Difficulty: Medium
+Time Limit: 10 seconds
+Language: Python
+Reference Solution:
+
+s = input().strip()
+words = s.split()
+best = ""
+for w in words:
+    if len(w) > len(best):
+        best = w
+print(best)
+Test Cases:
+Input: The quick brown fox jumps → Output: quick
+Input: a bb ccc → Output: ccc
+Input: hello world → Output: hello
+Sample I/O: Input: The quick brown fox jumps, Output: quick
+Majority Element
+
+Description: Given array, element appears > n/2 times, find it or print -1.
+Difficulty: Medium
+Time Limit: 10 seconds
+Language: Python
+Reference Solution:
+
+n = int(input())
+arr = list(map(int, input().split()))
+candidate = None
+count = 0
+for num in arr:
+    if count == 0:
+        candidate = num
+    count += (1 if num == candidate else -1)
+# Verify
+if arr.count(candidate) > n // 2:
+    print(candidate)
+else:
+    print(-1)
+Test Cases:
+Input: 9\n3 3 4 2 4 4 2 4 4 → Output: 4
+Input: 5\n1 2 3 4 5 → Output: -1
+Input: 3\n1 1 1 → Output: 1
+Sample I/O: Input: 9\n3 3 4 2 4 4 2 4 4, Output: 4
+Hard Challenges
+Longest Increasing Subsequence
+
+Description: Given array of n integers, find the length of the longest strictly increasing subsequence.
+Difficulty: Hard
+Time Limit: 15 seconds
+Language: Python
+Reference Solution:
+
+import bisect
+n = int(input())
+arr = list(map(int, input().split()))
+tails = []
+for x in arr:
+    i = bisect.bisect_left(tails, x)
+    if i == len(tails):
+        tails.append(x)
+    else:
+        tails[i] = x
+print(len(tails))
+Test Cases:
+Input: 6\n10 9 2 5 3 7 → Output: 3
+Input: 5\n1 2 3 4 5 → Output: 5
+Input: 4\n4 3 2 1 → Output: 1
+Sample I/O: Input: 6\n10 9 2 5 3 7, Output: 3
+Shortest Path in Grid
+
+Description: You are given an n x m grid of 0s and 1s. 0 = free cell, 1 = blocked. Start at (0,0), reach (n-1,m-1) moving up/down/left/right on free cells. Print minimum steps or -1.
+Difficulty: Hard
+Time Limit: 15 seconds
+Language: Python
+Reference Solution:
+
+from collections import deque
+n, m = map(int, input().split())
+grid = [list(map(int, input().split())) for _ in range(n)]
+if grid[0][0] == 1 or grid[n-1][m-1] == 1:
+    print(-1)
+    exit()
+dist = [[-1]*m for _ in range(n)]
+q = deque()
+q.append((0, 0))
+dist[0][0] = 0
+dirs = [(1,0),(-1,0),(0,1),(0,-1)]
+while q:
+    x, y = q.popleft()
+    if (x, y) == (n-1, m-1):
+        break
+    for dx, dy in dirs:
+        nx, ny = x+dx, y+dy
+        if 0 <= nx < n and 0 <= ny < m and grid[nx][ny] == 0 and dist[nx][ny] == -1:
+            dist[nx][ny] = dist[x][y] + 1
+            q.append((nx, ny))
+print(dist[n-1][m-1])
+Test Cases:
+Input: 3 3\n0 0 0\n1 1 0\n0 0 0 → Output: 4
+Input: 2 2\n0 1\n1 0 → Output: -1
+Input: 1 1\n0 → Output: 0
+Sample I/O: Input: 3 3\n0 0 0\n1 1 0\n0 0 0, Output: 4

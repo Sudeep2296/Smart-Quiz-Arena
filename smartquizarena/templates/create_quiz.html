@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Quiz - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0"><i class="fas fa-plus-circle"></i> Create New Quiz</h3>
+            </div>
+            <div class="card-body">
+                <form method="post" id="create-quiz-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Quiz Title</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="topic" class="form-label">Topic</label>
+                        <select class="form-select" id="topic" name="topic" required>
+                            <option value="">Select a topic</option>
+                            {% for topic in topics %}
+                            <option value="{{ topic.id }}">{{ topic.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+
+                    <!-- Questions Section -->
+                    <div id="questions-section">
+                        <h5 class="mb-3">Questions</h5>
+                        <div id="questions-container">
+                            <!-- Questions will be added here dynamically -->
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="add-question-btn">
+                            <i class="fas fa-plus"></i> Add Question
+                        </button>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Create Quiz
+                        </button>
+                        <a href="{% url 'quiz_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Question Template -->
+<div id="question-template" style="display: none;">
+    <div class="question-item card mb-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-2">
+                        <label class="form-label">Question Text</label>
+                        <input type="text" class="form-control question-text" name="question_text[]" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Question Type</label>
+                        <select class="form-select question-type" name="question_type[]">
+                            <option value="multiple_choice">Multiple Choice</option>
+                            <option value="true_false">True/False</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-2">
+                        <label class="form-label">Points</label>
+                        <input type="number" class="form-control points" name="points[]" value="1" min="1">
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm remove-question">
+                        <i class="fas fa-trash"></i> Remove
+                    </button>
+                </div>
+            </div>
+
+            <!-- Answers Section -->
+            <div class="answers-section">
+                <label class="form-label">Answers</label>
+                <div class="answers-container">
+                    <!-- Answers will be added here -->
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm add-answer">
+                    <i class="fas fa-plus"></i> Add Answer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Answer Template -->
+<div id="answer-template" style="display: none;">
+    <div class="answer-item input-group mb-2">
+        <div class="input-group-text">
+            <input class="form-check-input is-correct" type="checkbox" name="is_correct[]">
+        </div>
+        <input type="text" class="form-control answer-text" name="answer_text[]" placeholder="Enter answer" required>
+        <button class="btn btn-outline-danger remove-answer" type="button">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let questionCount = 0;
+
+    // Add question button
+    document.getElementById('add-question-btn').addEventListener('click', function() {
+        addQuestion();
+    });
+
+    function addQuestion() {
+        const template = document.getElementById('question-template');
+        const container = document.getElementById('questions-container');
+        const clone = template.content.cloneNode(true);
+
+        // Update question number
+        questionCount++;
+        const questionItem = clone.querySelector('.question-item');
+        questionItem.setAttribute('data-question-id', questionCount);
+
+        // Add event listeners
+        const addAnswerBtn = clone.querySelector('.add-answer');
+        addAnswerBtn.addEventListener('click', function() {
+            addAnswer(this.closest('.question-item'));
+        });
+
+        const removeBtn = clone.querySelector('.remove-question');
+        removeBtn.addEventListener('click', function() {
+            this.closest('.question-item').remove();
+        });
+
+        const questionTypeSelect = clone.querySelector('.question-type');
+        questionTypeSelect.addEventListener('change', function() {
+            updateAnswersForQuestionType(this.closest('.question-item'), this.value);
+        });
+
+        container.appendChild(clone);
+
+        // Add default answers
+        addAnswer(questionItem);
+        if (questionTypeSelect.value === 'multiple_choice') {
+            addAnswer(questionItem);
+            addAnswer(questionItem);
+        }
+    }
+
+    function addAnswer(questionItem) {
+        const template = document.getElementById('answer-template');
+        const container = questionItem.querySelector('.answers-container');
+        const clone = template.content.cloneNode(true);
+
+        const removeBtn = clone.querySelector('.remove-answer');
+        removeBtn.addEventListener('click', function() {
+            this.closest('.answer-item').remove();
+        });
+
+        container.appendChild(clone);
+    }
+
+    function updateAnswersForQuestionType(questionItem, type) {
+        const answersContainer = questionItem.querySelector('.answers-container');
+        const existingAnswers = answersContainer.querySelectorAll('.answer-item').length;
+
+        if (type === 'true_false') {
+            // Clear existing answers and add True/False
+            answersContainer.innerHTML = '';
+            addTrueFalseAnswers(questionItem);
+        } else if (type === 'multiple_choice' && existingAnswers < 2) {
+            // Ensure at least 2 answers for multiple choice
+            while (answersContainer.querySelectorAll('.answer-item').length < 2) {
+                addAnswer(questionItem);
+            }
+        }
+    }
+
+    function addTrueFalseAnswers(questionItem) {
+        const answersContainer = questionItem.querySelector('.answers-container');
+
+        // True answer
+        const trueTemplate = document.getElementById('answer-template');
+        const trueClone = trueTemplate.content.cloneNode(true);
+        trueClone.querySelector('.answer-text').value = 'True';
+        answersContainer.appendChild(trueClone);
+
+        // False answer
+        const falseClone = trueTemplate.content.cloneNode(true);
+        falseClone.querySelector('.answer-text').value = 'False';
+        answersContainer.appendChild(falseClone);
+    }
+
+    // Form submission
+    document.getElementById('create-quiz-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+
+        // Convert form data to JSON
+        const data = {
+            title: formData.get('title'),
+            topic: formData.get('topic'),
+            description: formData.get('description'),
+            questions: []
+        };
+
+        // Process questions
+        const questionItems = document.querySelectorAll('.question-item');
+        questionItems.forEach((item, index) => {
+            const question = {
+                question_text: item.querySelector('.question-text').value,
+                question_type: item.querySelector('.question-type').value,
+                points: parseInt(item.querySelector('.points').value) || 1,
+                answers: []
+            };
+
+            const answerItems = item.querySelectorAll('.answer-item');
+            answerItems.forEach(answerItem => {
+                const answer = {
+                    answer_text: answerItem.querySelector('.answer-text').value,
+                    is_correct: answerItem.querySelector('.is-correct').checked
+                };
+                question.answers.push(answer);
+            });
+
+            data.questions.push(question);
+        });
+
+        // Submit via AJAX
+        fetch('/api/quizzes/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.id) {
+                window.location.href = `/quizzes/${result.id}/`;
+            } else {
+                alert('Error creating quiz: ' + JSON.stringify(result));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating quiz');
+        });
+    });
+
+    // Add initial question
+    addQuestion();
+});
+</script>
+{% endblock %}

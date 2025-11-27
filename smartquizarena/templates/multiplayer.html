@@ -1,0 +1,562 @@
+{% extends 'base.html' %}
+
+{% block title %}Multiplayer - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4"><i class="fas fa-users"></i> Multiplayer Quiz Rooms</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Create New Room</h5>
+            </div>
+            <div class="card-body">
+                <form id="create-room-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="room-name" class="form-label">Room Name</label>
+                        <input type="text" class="form-control" id="room-name" name="name" placeholder="Enter room name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="topic-select" class="form-label">Select Topic</label>
+                        <select class="form-select" id="topic-select" name="topic" required>
+                            <option value="">Choose a topic...</option>
+                            {% for topic in topics %}
+                            {% if not topic.name == "Test Topic" %}
+                            <option value="{{ topic.id }}">{{ topic.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="num-questions" class="form-label">Number of Questions</label>
+                        <select class="form-select" id="num-questions" name="num_questions" required>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="level-select" class="form-label">Difficulty Level</label>
+                        <select class="form-select" id="level-select" name="level" required>
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="max-players" class="form-label">Max Players (2-10)</label>
+                        <select class="form-select" id="max-players" name="max_players">
+                            <option value="2">2 Players</option>
+                            <option value="3">3 Players</option>
+                            <option value="4" selected>4 Players</option>
+                            <option value="5">5 Players</option>
+                            <option value="6">6 Players</option>
+                            <option value="7">7 Players</option>
+                            <option value="8">8 Players</option>
+                            <option value="9">9 Players</option>
+                            <option value="10">10 Players</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-plus"></i> Create Room
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Join Room by Code</h5>
+            </div>
+            <div class="card-body">
+                <form id="join-room-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="room-code" class="form-label">Room Code</label>
+                        <input type="text" class="form-control text-uppercase" id="room-code" placeholder="Enter 6-digit room code" maxlength="6" required>
+                        <small class="form-text text-muted">Enter the room code provided by the host</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-sign-in-alt"></i> Join Room
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Current Room Status -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card" id="current-room-card" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0">Current Room</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6 id="current-room-name"></h6>
+                        <p class="mb-2">
+                            <strong>Room Code:</strong> <span id="room-code-display" class="badge bg-primary fs-6"></span>
+                        </p>
+                        <p class="mb-2">
+                            <strong>Topic:</strong> <span id="room-topic"></span> | 
+                            <strong>Questions:</strong> <span id="room-questions"></span> | 
+                            <strong>Level:</strong> <span id="room-level"></span>
+                        </p>
+                        <p class="mb-2">Players: <span id="player-count">1</span>/<span id="max-players-display">4</span></p>
+                        <div id="players-list" class="mb-3">
+                            <!-- Players will be listed here -->
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div id="room-messages" class="mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <!-- Room messages will be shown here -->
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button id="ready-btn" class="btn btn-warning">
+                                <i class="fas fa-check"></i> I&apos;m Ready
+                            </button>
+                            <button id="start-game-btn" class="btn btn-primary" disabled>
+                                <i class="fas fa-play"></i> Start Game
+                            </button>
+                            <button id="leave-room-btn" class="btn btn-danger">
+                                <i class="fas fa-sign-out-alt"></i> Leave Room
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaderboard Modal -->
+<div class="modal fade" id="leaderboardModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Live Leaderboard</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="leaderboard-content">
+                    <!-- Leaderboard will be updated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentRoom = null;
+let gameStarted = false;
+let pendingQuizId = null;
+let quizRedirected = false;
+let roomSocket = null;
+var currentUserId = {{ user.id|default:0 }};
+var currentUsername = "{{ user.username|default:''|escapejs }}";
+
+function getCSRFToken() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+}
+
+function connectRoomWebSocket(roomCode) {
+    if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+        roomSocket.close();
+    }
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/multiplayer/${roomCode}/`;
+    roomSocket = new WebSocket(wsUrl);
+
+    roomSocket.onopen = function(event) {
+        console.log('Connected to room WebSocket');
+    };
+
+    roomSocket.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            handleRoomWebSocketMessage(data);
+        } catch (e) {
+            console.error('Error parsing room WebSocket message:', e);
+        }
+    };
+
+    roomSocket.onclose = function(event) {
+        console.log('Room WebSocket connection closed', event);
+    };
+
+    roomSocket.onerror = function(error) {
+        console.error('Room WebSocket error:', error);
+    };
+}
+
+function handleRoomWebSocketMessage(data) {
+    switch(data.type) {
+        case 'player_joined':
+            addRoomMessage(data.message, 'success');
+            if (data.room) {
+                currentRoom = data.room;
+                displayCurrentRoom(data.room);
+            }
+            break;
+        case 'player_left':
+            addRoomMessage(data.message, 'warning');
+            if (data.room) {
+                currentRoom = data.room;
+                displayCurrentRoom(data.room);
+            }
+            break;
+        case 'player_ready':
+            addRoomMessage(data.message, 'info');
+            if (data.room) {
+                currentRoom = data.room;
+                displayCurrentRoom(data.room);
+            }
+            break;
+        case 'game_started':
+            addRoomMessage(data.message || 'Game started!', 'success');
+            gameStarted = true;
+            if (data.quiz_id) {
+                pendingQuizId = data.quiz_id;
+                redirectToQuiz(data.quiz_id);
+            } else {
+                addRoomMessage('Preparing quiz... please wait.', 'info');
+            }
+            break;
+        case 'quiz_generating':
+            addRoomMessage(data.message, 'info');
+            const startBtn = document.getElementById('start-game-btn');
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Quiz...';
+            }
+            break;
+        case 'quiz_generation_started':
+            addRoomMessage(data.message, 'info');
+            const startBtn2 = document.getElementById('start-game-btn');
+            if (startBtn2) {
+                startBtn2.disabled = true;
+                startBtn2.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Quiz...';
+            }
+            break;
+        case 'error':
+            alert(data.message);
+            break;
+    }
+}
+
+async function createRoom(e) {
+    e.preventDefault();
+    const form = document.getElementById('create-room-form');
+    const formData = new FormData(form);
+
+    const roomData = {
+        name: formData.get('name'),
+        topic: parseInt(formData.get('topic')),
+        num_questions: parseInt(formData.get('num_questions')),
+        level: formData.get('level'),
+        max_players: parseInt(formData.get('max_players')) || 4
+    };
+
+    try {
+        const response = await fetch('/multiplayer/rooms/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify(roomData)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            addRoomMessage(data.error || 'Failed to create room', 'error');
+            return;
+        }
+
+        currentRoom = data;
+        displayCurrentRoom(data);
+        connectRoomWebSocket(data.room_code);
+        addRoomMessage('Room created successfully! Share the room code with other players.', 'success');
+        form.reset();
+    } catch (error) {
+        addRoomMessage('Error creating room', 'error');
+    }
+}
+
+async function joinRoomByCode(e) {
+    e.preventDefault();
+    const roomCode = document.getElementById('room-code').value.toUpperCase().trim();
+
+    if (!roomCode || roomCode.length !== 6) {
+        alert('Please enter a valid 6-digit room code');
+        return;
+    }
+
+    try {
+        const response = await fetch('/multiplayer/join-by-code/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({room_code: roomCode})
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            addRoomMessage(data.error || 'Failed to join room', 'error');
+            return;
+        }
+
+        currentRoom = data;
+        displayCurrentRoom(data);
+        connectRoomWebSocket(data.room_code);
+        addRoomMessage('You joined the room successfully!', 'success');
+        document.getElementById('room-code').value = '';
+    } catch (error) {
+        addRoomMessage('Error joining room', 'error');
+    }
+}
+
+async function leaveRoom() {
+    if (!currentRoom) return;
+
+    try {
+        const response = await fetch('/multiplayer/leave/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                room_id: currentRoom.id,
+                user_id: currentUserId
+            })
+        });
+
+        if (response.ok) {
+            currentRoom = null;
+            document.getElementById('current-room-card').style.display = 'none';
+            pendingQuizId = null;
+            quizRedirected = false;
+            gameStarted = false;
+            if (roomSocket) {
+                roomSocket.close();
+            }
+            addRoomMessage('Left the room.', 'info');
+        } else {
+            const data = await response.json();
+            addRoomMessage(data.error || 'Failed to leave room', 'error');
+        }
+    } catch (error) {
+        addRoomMessage('Error leaving room', 'error');
+    }
+}
+
+async function startGame() {
+    if (gameStarted || !currentRoom) return;
+
+    const startBtn = document.getElementById('start-game-btn');
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+
+    try {
+        const response = await fetch('/multiplayer/start-game/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                room_id: currentRoom.id,
+                user_id: currentUserId
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            addRoomMessage(data.error || 'Failed to start game', 'error');
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<i class="fas fa-play"></i> Start Game';
+            return;
+        }
+
+        gameStarted = true;
+        addRoomMessage('Game started!', 'success');
+    } catch (error) {
+        addRoomMessage('Error starting game', 'error');
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fas fa-play"></i> Start Game';
+    }
+}
+
+async function toggleReady() {
+    if (!currentRoom) return;
+
+    const readyBtn = document.getElementById('ready-btn');
+
+    try {
+        const response = await fetch('/multiplayer/toggle-ready/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                room_id: currentRoom.id,
+                user_id: currentUserId
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            const isReady = data.is_ready;
+            if (isReady) {
+                readyBtn.innerHTML = '<i class="fas fa-times"></i> Not Ready';
+                readyBtn.classList.remove('btn-warning');
+                readyBtn.classList.add('btn-success');
+            } else {
+                readyBtn.innerHTML = '<i class="fas fa-check"></i> I\'m Ready';
+                readyBtn.classList.remove('btn-success');
+                readyBtn.classList.add('btn-warning');
+            }
+            addRoomMessage(isReady ? 'You are ready!' : 'You are not ready.', 'info');
+        } else {
+            addRoomMessage(data.error || 'Failed to toggle ready', 'error');
+        }
+    } catch (error) {
+        addRoomMessage('Error toggling ready', 'error');
+    }
+}
+
+// Event listeners
+document.getElementById('create-room-form').addEventListener('submit', createRoom);
+document.getElementById('join-room-form').addEventListener('submit', joinRoomByCode);
+document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
+document.getElementById('start-game-btn').addEventListener('click', startGame);
+document.getElementById('ready-btn').addEventListener('click', toggleReady);
+
+// Auto-uppercase room code input
+document.getElementById('room-code').addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase();
+});
+
+function redirectToQuiz(quizId) {
+    if (quizRedirected || !quizId) return;
+    quizRedirected = true;
+    setTimeout(function() {
+        window.location.href = `/quizzes/${quizId}/take/?multiplayer=true`;
+    }, 1000);
+}
+
+function displayCurrentRoom(room) {
+    document.getElementById('current-room-card').style.display = 'block';
+    gameStarted = room.game_started;
+    document.getElementById('current-room-name').textContent = room.name;
+    document.getElementById('room-code-display').textContent = room.room_code;
+    document.getElementById('room-topic').textContent = room.topic_name || 'N/A';
+    document.getElementById('room-questions').textContent = room.num_questions || 'N/A';
+    document.getElementById('room-level').textContent = (room.level || 'medium').charAt(0).toUpperCase() + (room.level || 'medium').slice(1);
+    document.getElementById('player-count').textContent = room.players.length;
+    document.getElementById('max-players-display').textContent = room.max_players;
+
+    const playersList = document.getElementById('players-list');
+    playersList.innerHTML = room.players.map(player => {
+        const hostBadge = player.is_host ? '<span class="badge bg-primary ms-2">Host</span>' : '';
+        const readyBadge = player.is_ready ? '<span class="badge bg-success"><i class="fas fa-check"></i> Ready</span>' : '<span class="badge bg-secondary">Not Ready</span>';
+        return `<div class="d-flex align-items-center justify-content-between mb-2 p-2 border rounded">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-user-circle me-2"></i>
+                <span>${player.username}</span>
+                ${hostBadge}
+            </div>
+            ${readyBadge}
+        </div>`;
+    }).join('');
+
+    const roomMessages = document.getElementById('room-messages');
+    if (!roomMessages || roomMessages.children.length === 0) {
+        if (roomMessages) {
+            roomMessages.innerHTML = '<div class="alert alert-info py-2 mb-2">Welcome to the room! Wait for other players to join.</div>';
+        }
+    }
+
+    const currentPlayer = room.players.find(p => p.username === currentUsername);
+    const readyBtn = document.getElementById('ready-btn');
+    if (currentPlayer) {
+        if (currentPlayer.is_ready) {
+            readyBtn.innerHTML = '<i class="fas fa-times"></i> Not Ready';
+            readyBtn.classList.remove('btn-warning');
+            readyBtn.classList.add('btn-success');
+        } else {
+            readyBtn.innerHTML = '<i class="fas fa-check"></i> I\'m Ready';
+            readyBtn.classList.remove('btn-success');
+            readyBtn.classList.add('btn-warning');
+        }
+    }
+
+    const startBtn = document.getElementById('start-game-btn');
+    const isHost = room.players.some(p => p.is_host && p.username === currentUsername);
+    const hasEnoughPlayers = room.players.length >= 2;
+    const gameNotStarted = !room.game_started;
+    startBtn.disabled = !(isHost && hasEnoughPlayers && gameNotStarted);
+    
+    if (room.game_started) {
+        startBtn.innerHTML = '<i class="fas fa-check"></i> Game Started';
+        startBtn.classList.remove('btn-primary');
+        startBtn.classList.add('btn-success');
+        readyBtn.disabled = true;
+    } else {
+        startBtn.innerHTML = '<i class="fas fa-play"></i> Start Game';
+        startBtn.classList.remove('btn-success');
+        startBtn.classList.add('btn-primary');
+        readyBtn.disabled = false;
+        gameStarted = false;
+        pendingQuizId = null;
+        quizRedirected = false;
+    }
+}
+
+function addRoomMessage(message, type) {
+    const messagesDiv = document.getElementById('room-messages');
+    if (!messagesDiv) return;
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert alert-${type} py-2 mb-2`;
+    messageDiv.textContent = message;
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+// Populate number of questions dropdown
+document.addEventListener('DOMContentLoaded', function() {
+    const numQuestionsSelect = document.getElementById('num-questions');
+    if (numQuestionsSelect) {
+        const options = [5, 10, 15, 20];
+        options.forEach(function(num) {
+            const option = document.createElement('option');
+            option.value = num;
+            option.textContent = num;
+            if (num === 10) {
+                option.selected = true;
+            }
+            numQuestionsSelect.appendChild(option);
+        });
+    }
+});
+</script>
+{% endblock %}

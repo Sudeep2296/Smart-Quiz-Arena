@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Coding Challenge Results{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">Coding Challenge Results</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Player 1: {{ player1.username }}</h4>
+                            <p class="h5 text-success">Score: {{ player1_score }}</p>
+                        </div>
+                        {% if player2 %}
+                        <div class="col-md-6">
+                            <h4>Player 2: {{ player2.username }}</h4>
+                            <p class="h5 text-success">Score: {{ player2_score }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <hr>
+
+                    <div class="text-center">
+                        {% if is_tie %}
+                        <h3 class="text-warning">It's a Tie!</h3>
+                        {% else %}
+                        <h3 class="text-success">
+                            {% if is_winner %}
+                            Congratulations! You Won!
+                            {% else %}
+                            Winner: {{ winner }}
+                            {% endif %}
+                        </h3>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-4 text-center">
+                        <a href="{% url 'code_battle' %}" class="btn btn-primary">Back to Coding Challenges</a>
+                        <a href="{% url 'leaderboard' %}" class="btn btn-secondary">View Leaderboard</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

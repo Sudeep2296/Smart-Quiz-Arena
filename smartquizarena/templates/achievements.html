@@ -1,0 +1,377 @@
+{% extends 'base.html' %}
+
+{% block title %}Achievements - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-5 fw-bold mb-2">
+                <i class="fas fa-trophy text-warning"></i> Your Achievements
+            </h1>
+            <p class="text-muted">Unlock badges and track your journey to mastery</p>
+        </div>
+    </div>
+
+    {% if achievements %}
+    <!-- Achievement Stats Overview -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="stat-card-small">
+                <div class="stat-icon-small bg-warning">
+                    <i class="fas fa-medal"></i>
+                </div>
+                <div class="stat-content-small">
+                    <h3 class="stat-number-small">{{ achievements|length }}</h3>
+                    <p class="stat-label-small">Earned Badges</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card-small">
+                <div class="stat-icon-small bg-info">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stat-content-small">
+                    <h3 class="stat-number-small">{{ total_badges|default:10 }}</h3>
+                    <p class="stat-label-small">Total Available</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card-small">
+                <div class="stat-icon-small bg-success">
+                    <i class="fas fa-percentage"></i>
+                </div>
+                <div class="stat-content-small">
+                    <h3 class="stat-number-small">{{ completion_percentage|default:20 }}%</h3>
+                    <p class="stat-label-small">Completion</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievement Cards Grid -->
+    <div class="row">
+        {% for achievement in achievements %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="achievement-card unlocked">
+                <div class="achievement-glow"></div>
+                <div class="card h-100 border-0">
+                    <div class="card-body p-4">
+                        <div class="achievement-icon-container mb-3">
+                            <div class="achievement-icon unlocked-icon">
+                                <i class="fas fa-medal"></i>
+                            </div>
+                            <div class="achievement-sparkle">
+                                <i class="fas fa-star"></i>
+                            </div>
+                        </div>
+                        <h5 class="achievement-title">{{ achievement.badge.name }}</h5>
+                        <p class="achievement-description">{{ achievement.badge.description }}</p>
+                        <div class="achievement-footer">
+                            <span class="badge bg-success mb-2">
+                                <i class="fas fa-check"></i> Unlocked
+                            </span>
+                            <p class="achievement-date mb-0">
+                                <i class="far fa-calendar"></i> {{ achievement.earned_at|date:"M d, Y" }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Example Locked Achievements (you can add these from backend) -->
+        {% if show_locked_achievements %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="achievement-card locked">
+                <div class="card h-100 border-0">
+                    <div class="card-body p-4">
+                        <div class="achievement-icon-container mb-3">
+                            <div class="achievement-icon locked-icon">
+                                <i class="fas fa-lock"></i>
+                            </div>
+                        </div>
+                        <h5 class="achievement-title">Master Quizzer</h5>
+                        <p class="achievement-description">Complete 50 quizzes with 80%+ accuracy</p>
+                        <div class="achievement-footer">
+                            <span class="badge bg-secondary mb-2">
+                                <i class="fas fa-lock"></i> Locked
+                            </span>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: 45%"></div>
+                            </div>
+                            <p class="achievement-hint mb-0 mt-1">
+                                <small>22/50 quizzes completed</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="row">
+        <div class="col-12">
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <h3 class="empty-state-title">No Achievements Yet</h3>
+                <p class="empty-state-text">Start your journey and earn your first badge!</p>
+                <div class="empty-state-actions">
+                    <a href="{% url 'single_player' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-play"></i> Start Playing
+                    </a>
+                    <a href="{% url 'multiplayer:home' %}" class="btn btn-outline-success btn-lg">
+                        <i class="fas fa-users"></i> Join Multiplayer
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    /* Stats Cards */
+    .stat-card-small {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        height: 100%;
+    }
+
+    .stat-icon-small {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        color: white;
+    }
+
+    .stat-content-small {
+        flex: 1;
+    }
+
+    .stat-number-small {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 0;
+    }
+
+    .stat-label-small {
+        color: #6c757d;
+        margin-bottom: 0;
+        font-size: 0.875rem;
+    }
+
+    /* Achievement Cards */
+    .achievement-card {
+        position: relative;
+        transition: transform 0.3s ease;
+    }
+
+    .achievement-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .achievement-card.unlocked .card {
+        background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .achievement-card.locked .card {
+        background: #f8f9fa;
+        opacity: 0.7;
+    }
+
+    .achievement-glow {
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, #ffc107, #ff9800);
+        border-radius: 15px;
+        opacity: 0;
+        filter: blur(10px);
+        transition: opacity 0.3s ease;
+        z-index: -1;
+    }
+
+    .achievement-card.unlocked:hover .achievement-glow {
+        opacity: 0.3;
+    }
+
+    .achievement-icon-container {
+        position: relative;
+        text-align: center;
+    }
+
+    .achievement-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        position: relative;
+    }
+
+    .unlocked-icon {
+        background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+        animation: pulse-glow 2s infinite;
+    }
+
+    .locked-icon {
+        background: #e9ecef;
+        color: #6c757d;
+    }
+
+    .achievement-sparkle {
+        position: absolute;
+        top: 0;
+        right: calc(50% - 50px);
+        font-size: 1.25rem;
+        color: #ffc107;
+        animation: sparkle 1.5s infinite;
+    }
+
+    .achievement-title {
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .achievement-description {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-align: center;
+        margin-bottom: 15px;
+        min-height: 40px;
+    }
+
+    .achievement-footer {
+        text-align: center;
+        border-top: 1px solid #e9ecef;
+        padding-top: 15px;
+    }
+
+    .achievement-date {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    .achievement-hint {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .empty-state-icon {
+        font-size: 5rem;
+        color: #ffc107;
+        margin-bottom: 20px;
+        animation: bounce 2s infinite;
+    }
+
+    .empty-state-title {
+        font-size: 1.75rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    .empty-state-text {
+        color: #6c757d;
+        font-size: 1.1rem;
+        margin-bottom: 30px;
+    }
+
+    .empty-state-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    /* Animations */
+    @keyframes pulse-glow {
+
+        0%,
+        100% {
+            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+        }
+
+        50% {
+            box-shadow: 0 4px 25px rgba(255, 193, 7, 0.6);
+        }
+    }
+
+    @keyframes sparkle {
+
+        0%,
+        100% {
+            opacity: 0;
+            transform: scale(0.5) rotate(0deg);
+        }
+
+        50% {
+            opacity: 1;
+            transform: scale(1) rotate(180deg);
+        }
+    }
+
+    @keyframes bounce {
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .achievement-card {
+            margin-bottom: 20px;
+        }
+
+        .empty-state-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .empty-state-actions .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}

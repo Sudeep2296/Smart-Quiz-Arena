@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Coding Challenge Room - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4>Coding Challenge Room</h4>
+                    <h6>Battle Code: <strong id="battle-code">{{ battle.battle_code }}</strong></h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Players</h5>
+                            <ul class="list-group" id="players-list">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>Host: {{ battle.player1.username }}</span>
+                                    <span class="badge bg-danger" id="player1-ready">Not Ready</span>
+                                    {% if is_host %}
+                                    <button class="btn btn-sm btn-outline-primary ms-2" id="player1-ready-btn"
+                                        onclick="toggleReady()">Set Ready</button>
+                                    {% endif %}
+                                </li>
+                                {% if battle.player2 %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>Player 2: {{ battle.player2.username }}</span>
+                                    <span class="badge bg-danger" id="player2-ready">Not Ready</span>
+                                    {% if not is_host %}
+                                    <button class="btn btn-sm btn-outline-primary ms-2" id="player2-ready-btn"
+                                        onclick="toggleReady()">Set Ready</button>
+                                    {% endif %}
+                                </li>
+                                {% else %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>Player 2: Waiting...</span>
+                                    <span class="badge bg-warning">Waiting</span>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Battle Settings</h5>
+                            <p><strong>Number of Questions:</strong> {{ battle.num_questions }}</p>
+                            <p><strong>Level:</strong> {{ battle.level|title }}</p>
+                            <p><strong>Status:</strong> {{ battle.status }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                        {% if is_host %}
+                        <div id="host-controls">
+                            <p id="waiting-message" class="text-warning {% if battle.player2 %}d-none{% endif %}">
+                                Waiting for second player to join...
+                            </p>
+                            <button id="start-battle-btn"
+                                class="btn btn-success btn-lg {% if not battle.player2 %}d-none{% endif %}">
+                                <i class="fas fa-rocket"></i> Start Battle
+                            </button>
+                        </div>
+                        {% else %}
+                        <p class="text-info">Waiting for host to start the battle...</p>
+                        {% endif %}
+                    </div>
+                    <div id="notifications" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const battleCode = "{{ battle.battle_code }}";
+    const userId = {{ user.id }};
+    const isHost = {{ is_host|yesno:"true,false" }};
+    let socket;
+
+    function connectWebSocket() {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        socket = new WebSocket(
+            wsProtocol + '//' + window.location.host + '/ws/codebattle/' + battleCode + '/'
+        );
+
+        socket.onopen = function (e) {
+            console.log('WebSocket connected');
+        };
+
+        socket.onmessage = function (e) {
+            const data = JSON.parse(e.data);
+            console.log('Message received:', data);
+
+            if (data.type === 'player_joined') {
+                addNotification(`Player ${data.username} joined the battle!`);
+                updatePlayersList(data.players, data.battle);
+
+                if (isHost) {
+                    const waitingMsg = document.getElementById('waiting-message');
+                    const startBtn = document.getElementById('start-battle-btn');
+                    if (waitingMsg) waitingMsg.classList.add('d-none');
+                    if (startBtn) startBtn.classList.remove('d-none');
+                }
+            } else if (data.type === 'player_left') {
+                addNotification(`Player ${data.username} left the battle.`);
+                updatePlayersList(data.players, data.battle);
+
+                if (isHost) {
+                    const waitingMsg = document.getElementById('waiting-message');
+                    const startBtn = document.getElementById('start-battle-btn');
+                    if (waitingMsg) waitingMsg.classList.remove('d-none');
+                    if (startBtn) startBtn.classList.add('d-none');
+                }
+            } else if (data.type === 'ready_status_update') {
+                updateReadyStatus(data.battle);
+            } else if (data.type === 'battle_started') {
+                addNotification('Battle started! Redirecting to code editor...');
+                setTimeout(() => {
+                    window.location.href = `/codebattle/editor/?battle_code=${battleCode}`;
+                }, 1000);
+            } else if (data.type === 'error') {
+                addNotification(data.message, 'error');
+            }
+        };
+
+        socket.onclose = function (e) {
+            console.log('WebSocket closed');
+            setTimeout(connectWebSocket, 1000); // Reconnect
+        };
+
+        socket.onerror = function (e) {
+            console.log('WebSocket error');
+        };
+    }
+
+    function addNotification(message, type = 'info') {
+        const notifications = document.getElementById('notifications');
+        const alertClass = type === 'error' ? 'alert-danger' : 'alert-info';
+        const div = document.createElement('div');
+        div.className = `alert ${alertClass} alert-dismissible fade show`;
+        div.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        notifications.appendChild(div);
+        setTimeout(() => div.remove(), 5000);
+    }
+
+    function toggleReady() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: 'set_ready',
+                battle_code: battleCode
+            }));
+        }
+    }
+
+    function updateReadyStatus(battle) {
+        const player1Ready = document.getElementById('player1-ready');
+        const player2Ready = document.getElementById('player2-ready');
+        const player1Btn = document.getElementById('player1-ready-btn');
+        const player2Btn = document.getElementById('player2-ready-btn');
+
+        if (player1Ready) {
+            player1Ready.textContent = battle.player1_ready ? 'Ready' : 'Not Ready';
+            player1Ready.className = `badge ${battle.player1_ready ? 'bg-success' : 'bg-danger'}`;
+        }
+
+        if (player2Ready) {
+            player2Ready.textContent = battle.player2_ready ? 'Ready' : 'Not Ready';
+            player2Ready.className = `badge ${battle.player2_ready ? 'bg-success' : 'bg-danger'}`;
+        }
+
+        if (player1Btn) {
+            player1Btn.textContent = battle.player1_ready ? 'Not Ready' : 'Set Ready';
+        }
+        if (player2Btn) {
+            player2Btn.textContent = battle.player2_ready ? 'Not Ready' : 'Set Ready';
+        }
+    }
+
+    function updatePlayersList(players, battle) {
+        const list = document.getElementById('players-list');
+        list.innerHTML = `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>Host: ${players[0].username}</span>
+                <span class="badge ${battle.player1_ready ? 'bg-success' : 'bg-danger'}" id="player1-ready">${battle.player1_ready ? 'Ready' : 'Not Ready'}</span>
+                ${isHost ? `<button class="btn btn-sm btn-outline-primary ms-2" id="player1-ready-btn" onclick="toggleReady()">${battle.player1_ready ? 'Not Ready' : 'Set Ready'}</button>` : ''}
+            </li>
+        `;
+        if (players.length > 1) {
+            list.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>Player 2: ${players[1].username}</span>
+                    <span class="badge ${battle.player2_ready ? 'bg-success' : 'bg-danger'}" id="player2-ready">${battle.player2_ready ? 'Ready' : 'Not Ready'}</span>
+                    ${!isHost ? `<button class="btn btn-sm btn-outline-primary ms-2" id="player2-ready-btn" onclick="toggleReady()">${battle.player2_ready ? 'Not Ready' : 'Set Ready'}</button>` : ''}
+                </li>
+            `;
+        } else {
+            list.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>Player 2: Waiting...</span>
+                    <span class="badge bg-warning">Waiting</span>
+                </li>
+            `;
+        }
+        updateReadyStatus(battle);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        connectWebSocket();
+
+        // Tab switch detection for multiplayer mode
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'tab_switch_warning'
+                }));
+            }
+        });
+
+        const startBtn = document.getElementById('start-battle-btn');
+        if (startBtn) {
+            startBtn.addEventListener('click', function () {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: 'start_battle',
+                        battle_code: battleCode
+                    }));
+                    startBtn.disabled = true;
+                    startBtn.textContent = 'Starting...';
+                    addNotification('Starting battle...', 'info');
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+{% load static %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('singlePlayerForm');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            });
+        }
+    });
+</script>
+<div class="row">
+    <div class="col-12 text-center mb-5">
+        <h1 class="display-4 fw-bold text-primary">Welcome to SmartQuiz Arena</h1>
+        <p class="lead text-muted">Challenge yourself with AI-generated aptitude questions, compete in real-time
+            multiplayer, and battle in 1vs1 code challenges!</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <!-- Single Player Mode -->
+    <div class="col-md-4">
+        <div class="card game-mode-card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-user fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">Single Player</h5>
+                <p class="card-text">Test your knowledge with personalized quizzes and track your progress with streaks
+                    and achievements.</p>
+                <a href="{% url 'single_player' %}" class="btn btn-primary">Start Quiz</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multiplayer Mode -->
+    <div class="col-md-4">
+        <div class="card game-mode-card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-3x text-success mb-3"></i>
+                <h5 class="card-title">Multiplayer</h5>
+                <p class="card-text">Join real-time quiz rooms, compete with friends, and climb the live leaderboards.
+                </p>
+                <a href="{% url 'multiplayer:home' %}" class="btn btn-success">Join Room</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Coding Challenges Mode -->
+    <div class="col-md-4">
+        <div class="card game-mode-card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-code fa-3x text-warning mb-3"></i>
+                <h5 class="card-title">Coding Challenges</h5>
+                <p class="card-text">Challenge opponents in 1vs1 coding battles. Write, test, and compete in real-time!
+                </p>
+                <a href="{% url 'code_battle' %}" class="btn btn-warning">Start Battle</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Recent Achievements -->
+{% if user.is_authenticated and user.userprofile.achievements.all %}
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-trophy"></i> Recent Achievements</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for achievement in user.userprofile.achievements.all|slice:":6" %}
+                    <div class="col-md-2 text-center mb-3">
+                        <i class="fas fa-medal fa-2x text-warning"></i>
+                        <p class="mb-0 small">{{ achievement.name }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+
+{% endblock %}

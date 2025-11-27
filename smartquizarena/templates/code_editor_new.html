@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Code Editor - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- 👨‍💻 Code Editor -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4>Code Battle Editor</h4>
+                    <p>Battle Code: <strong>{{ battle.battle_code }}</strong> | Status: {{ battle.status }}</p>
+                </div>
+                <div class="card-body">
+                    {% if current_challenge %}
+                    <h5>Current Challenge: {{ current_challenge.title }}</h5>
+                    <p><strong>Description:</strong> {{ current_challenge.description }}</p>
+                    <p><strong>Problem Statement:</strong> {{ current_challenge.problem_statement }}</p>
+                    <p><strong>Sample Input/Output:</strong> {{ current_challenge.sample_io }}</p>
+                    <p><strong>Difficulty:</strong> {{ current_challenge.difficulty }} |
+                        <strong>Time Limit:</strong> {{ current_challenge.time_limit }}s
+                    </p>
+
+                    <!-- Code Input -->
+                    <div class="mb-3">
+                        <label class="form-label">Your Code:</label>
+                        <textarea class="form-control" id="code-input" rows="15"
+                            placeholder="Write your code here..."></textarea>
+                    </div>
+                    <div id="typing-status" class="text-muted small mb-2"></div>
+
+                    <!-- Language -->
+                    <div class="mb-3">
+                        <label class="form-label">Language:</label>
+                        <select class="form-select" id="language-select">
+                            <option value="python">Python</option>
+                            <option value="c">C</option>
+                            <option value="cpp">C++</option>
+                            <option value="java">Java</option>
+                        </select>
+                    </div>
+
+                    <!-- Input / Output -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Standard Input (optional):</label>
+                            <textarea class="form-control" id="stdin-input" rows="5"
+                                placeholder="Enter input for your program..."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Terminal Output:</label>
+                            <div id="terminal-output" class="border rounded p-3 bg-dark text-light"
+                                style="min-height: 150px; font-family: 'Courier New', monospace; font-size: 14px;">
+                                <div class="text-muted">Output will appear here...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="mb-3">
+                        <button id="run-code" class="btn btn-info me-2">Run Code</button>
+                        <button id="submit-code" class="btn btn-success">Submit Code</button>
+                    </div>
+
+                    <div id="run-result"></div>
+                    <div id="submission-result" class="mt-3"></div>
+                    {% else %}
+                    <p>No challenge available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 🧑‍🤝‍🧑 Battle Info -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5>Battle Info</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Host:</strong> {{ battle.player1.username }} {% if is_host %}(You){% endif %}</p>
+                    <p><strong>Opponent:</strong> {{ battle.player2.username|default:"Waiting..." }}</p>
+                    <p><strong>Questions:</strong> {{ battle.num_questions }}</p>
+                    <p><strong>Level:</strong> {{ battle.level|title }}</p>
+                    <p><strong>Current Challenge:</strong> {{ battle.current_challenge_index|add:1 }} / {{
+                        battle.num_questions }}</p>
+                    <div id="opponent-status" class="small text-muted">Opponent Status: Waiting...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="notifications" class="mt-3"></div>
+</div>
+
+<!-- 🧠 JS Variables -->
+<script>
+    const isHost = "{{ is_host|yesno:'true,false' }}" === "true";
+    const battleCode = "{{ battle.battle_code }}";
+    const loggedInUser = "{{ request.user.username }}";
+</script>
+
+<script>
+    let socket = null;
+
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        socket = new WebSocket(`${protocol}//${window.location.host}/ws/codebattle/${battleCode}/`);
+
+        socket.onmessage = handleMessage;
+        socket.onclose = () => setTimeout(connectWebSocket, 1000);
+    }
+
+    /* 💬 Safe Typing Indicator */
+    const codeInput = document.getElementById('code-input');
+    const typingStatus = document.getElementById('typing-status');
+    let typingTimeout = null;
+
+    codeInput?.addEventListener('keyup', () => {
+        if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'typing' }));
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => socket.send(JSON.stringify({ type: 'stop_typing' })), 1500);
+    });
+
+    function showTypingStatus(username) {
+        if (username !== loggedInUser) typingStatus.textContent = `💬 ${username} is typing...`;
+    }
+    function hideTypingStatus() {
+        typingStatus.textContent = "";
+    }
+
+    /* 📨 Incoming Messages */
+    function handleMessage(e) {
+        const data = JSON.parse(e.data);
+        switch (data.type) {
+            case 'typing': showTypingStatus(data.username); break;
+            case 'stop_typing': hideTypingStatus(); break;
+        }
+    }
+
+    /* 🎬 Init */
+    document.addEventListener('DOMContentLoaded', connectWebSocket);
+</script>
+{% endblock %}

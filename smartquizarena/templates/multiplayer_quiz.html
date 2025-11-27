@@ -1,0 +1,380 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Multiplayer Quiz - {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Quiz Area -->
+        <div class="col-md-8">
+            <div id="quiz-container" class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 id="quiz-title">{{ quiz.title }}</h3>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span id="question-counter">Question 1 of {{ questions|length }}</span>
+                        <div id="timer-container" class="badge badge-warning p-2">
+                            <i class="fas fa-clock"></i> <span id="timer">20</span>s
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <!-- Question Display -->
+                    <div id="question-section">
+                        <h4 id="question-text" class="mb-4">Loading question...</h4>
+
+                        <!-- Answer Options -->
+                        <div id="answer-options" class="row">
+                            <!-- Options will be populated by JavaScript -->
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="text-center mt-4">
+                            <button id="submit-answer-btn" class="btn btn-success btn-lg" disabled>
+                                <i class="fas fa-check"></i> Submit Answer
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Round Results (shown during review) -->
+                    <div id="round-results" class="d-none">
+                        <h4 class="text-center mb-4">Round Results</h4>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Correct Answer:</h5>
+                                <div id="correct-answer-display" class="alert alert-success"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Your Answer:</h5>
+                                <div id="your-answer-display" class="alert alert-info"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <h5>All Players:</h5>
+                            <div id="player-results" class="list-group">
+                                <!-- Player results will be populated -->
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <div id="review-timer" class="badge badge-info p-2">
+                                Review Time: <span id="review-countdown">5</span>s
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quiz Finished -->
+                    <div id="quiz-finished" class="d-none text-center">
+                        <h3 class="text-success mb-4">🎉 Quiz Completed!</h3>
+                        <div id="final-leaderboard">
+                            <!-- Final leaderboard will be populated -->
+                        </div>
+                        <a href="{% url 'home' %}" class="btn btn-primary mt-3">Back to Home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Leaderboard -->
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white">
+                    <h5><i class="fas fa-trophy"></i> Leaderboard</h5>
+                </div>
+                <div class="card-body">
+                    <div id="leaderboard" class="list-group">
+                        <!-- Leaderboard will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Room Info -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-users"></i> Room Info</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Room:</strong> <span id="room-code">{{ room.room_code }}</span></p>
+                    <p><strong>Players:</strong> <span id="player-count">1</span>/<span id="max-players">{{ room.max_players }}</span></p>
+                    <div id="player-list">
+                        <!-- Player list will be populated -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="status-messages" class="mt-3">
+                <!-- Status messages will appear here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WebSocket JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userUsername = '{{ user.username }}';
+    const roomCode = '{{ room.room_code }}';
+
+    const quizSocket = new WebSocket(
+        'ws://' + window.location.host + '/ws/quiz/room/' + roomCode + '/'
+    );
+
+    let currentQuestionIndex = 0;
+    let selectedAnswer = null;
+    let hasAnswered = false;
+    let currentTimerDuration = 20;
+    let currentQuestionData = null;
+
+    // DOM Elements
+    const questionText = document.getElementById('question-text');
+    const answerOptions = document.getElementById('answer-options');
+    const submitBtn = document.getElementById('submit-answer-btn');
+    const timerDisplay = document.getElementById('timer');
+    const questionCounter = document.getElementById('question-counter');
+
+    const questionSection = document.getElementById('question-section');
+    const roundResults = document.getElementById('round-results');
+    const quizFinished = document.getElementById('quiz-finished');
+
+    const leaderboard = document.getElementById('leaderboard');
+    const playerCount = document.getElementById('player-count');
+    const playerResults = document.getElementById('player-results');
+
+    const statusMessages = document.getElementById('status-messages');
+
+    // ----------------( SOCKET HANDLERS )----------------
+
+    quizSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        console.log("WS:", data);
+
+        switch(data.type) {
+            case 'quiz_start':
+                showStatusMessage('Quiz starting...', 'info');
+                break;
+
+            case 'new_question':
+                renderQuestion(data);
+                break;
+
+            case 'timer':
+                updateTimer(data.remaining);
+                break;
+
+            case 'timer_reduced':
+                showStatusMessage(`${data.triggered_by} answered quickly! Timer reduced to ${data.new_duration}s`, 'warning');
+                break;
+
+            case 'player_answered':
+                showStatusMessage(`${data.user} answered (${data.answered_count}/${data.total_players})`, 'info');
+                break;
+
+            case 'round_result':
+                showRoundResults(data);
+                break;
+
+            case 'review_start':
+                startReviewCountdown(data.duration);
+                break;
+
+            case 'review_end':
+                resetForNextQuestion();
+                break;
+
+            case 'quiz_finished':
+                renderFinalResults(data);
+                break;
+
+            case 'error':
+                showError(data.message);
+                break;
+        }
+    };
+
+    quizSocket.onclose = () => showError("Connection lost. Please refresh.");
+
+    // ----------------( RENDER QUESTION )----------------
+
+    function renderQuestion(data) {
+        hasAnswered = false;
+        selectedAnswer = null;
+        currentQuestionIndex = data.question_index;
+        currentTimerDuration = data.timer_duration;
+        currentQuestionData = data.question;
+
+        questionSection.classList.remove('d-none');
+        roundResults.classList.add('d-none');
+        quizFinished.classList.add('d-none');
+
+        questionText.textContent = data.question.question_text;
+        questionCounter.textContent = `Question ${currentQuestionIndex + 1}`;
+        updateTimer(currentTimerDuration);
+
+        // Render options
+        answerOptions.innerHTML = '';
+        data.question.answers.forEach(option => {
+            const col = document.createElement('div');
+            col.className = 'col-md-6 mb-3';
+
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-outline-primary btn-block option-btn';
+            btn.textContent = option.answer_text;
+            btn.dataset.answerId = option.id;
+            btn.onclick = (e) => selectAnswer(option.id, e);
+
+            col.appendChild(btn);
+            answerOptions.appendChild(col);
+        });
+
+        submitBtn.disabled = true;
+        showStatusMessage("Select your answer...", "info");
+    }
+
+    // ----------------( ANSWER SELECT/SUBMIT )----------------
+
+    function selectAnswer(answerId, event) {
+        if (hasAnswered) return;
+        selectedAnswer = answerId;
+
+        document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        submitBtn.disabled = false;
+    }
+
+    submitBtn.addEventListener('click', function() {
+        if (!selectedAnswer || hasAnswered) return;
+        hasAnswered = true;
+        submitBtn.disabled = true;
+
+        document.querySelectorAll('.option-btn').forEach(btn => (btn.disabled = true));
+
+        quizSocket.send(JSON.stringify({
+            type: 'submit_answer',
+            question_index: currentQuestionIndex,
+            answer: selectedAnswer
+        }));
+
+        showStatusMessage("Answer submitted. Waiting for others...", "success");
+    });
+
+    // ----------------( ROUND RESULT UI )----------------
+
+    function showRoundResults(data) {
+        questionSection.classList.add('d-none');
+        roundResults.classList.remove('d-none');
+
+        const correctIndex = data.correct_answer;
+        const correctText = currentQuestionData.answers[correctIndex].answer_text;
+        document.getElementById('correct-answer-display').textContent = correctText;
+
+        playerResults.innerHTML = '';
+        data.player_results.forEach(r => {
+            const item = document.createElement('div');
+            item.className = `list-group-item ${r.is_correct ? "list-group-item-success" : "list-group-item-danger"}`;
+            item.innerHTML = `<strong>${r.user}</strong>: ${r.selected || "No answer"} <span class="badge badge-secondary float-right">${r.score_gained} pts</span> <br><small>${r.answer_time}s</small>`;
+            playerResults.appendChild(item);
+
+            if (r.user === userUsername) {
+                const yourAns = document.getElementById('your-answer-display');
+                yourAns.textContent = r.selected || "No answer";
+                yourAns.className = `alert ${r.is_correct ? "alert-success" : "alert-danger"}`;
+            }
+        });
+
+        updateLeaderboard(data.leaderboard);
+        showStatusMessage("Review answers...", "info");
+    }
+
+    function startReviewCountdown(seconds) {
+        let t = seconds;
+        const el = document.getElementById('review-countdown');
+        el.textContent = t;
+        const tick = setInterval(() => {
+            t--;
+            el.textContent = t;
+            if (t <= 0) clearInterval(tick);
+        }, 1000);
+    }
+
+    function resetForNextQuestion() {
+        showStatusMessage("Next question...", "info");
+    }
+
+    // ----------------( QUIZ FINISH )----------------
+
+    function renderFinalResults(data) {
+        questionSection.classList.add('d-none');
+        roundResults.classList.add('d-none');
+        quizFinished.classList.remove('d-none');
+
+        const finalLeaderboard = document.getElementById('final-leaderboard');
+        finalLeaderboard.innerHTML = "<div class='list-group'>";
+        data.final_leaderboard.forEach((p, i) => {
+            finalLeaderboard.innerHTML += `<div class="list-group-item d-flex justify-content-between"><span>${p.user}</span><span class="badge badge-primary">${p.score} pts</span></div>`;
+        });
+        finalLeaderboard.innerHTML += "</div>";
+    }
+
+    // ----------------( SMALL HELPERS )----------------
+
+    function updateTimer(r) {
+        timerDisplay.textContent = r;
+        timerDisplay.parentElement.className = r <= 5 ? "badge badge-danger p-2" : "badge badge-warning p-2";
+    }
+
+    function updateLeaderboard(data) {
+        leaderboard.innerHTML = '';
+        data.forEach((p, i) => {
+            leaderboard.innerHTML += `<div class="list-group-item d-flex justify-content-between align-items-center"><span>${p.user}</span><span class="badge badge-primary">${p.score}</span></div>`;
+        });
+    }
+
+    function showStatusMessage(msg, type) {
+        const cls = type === "error" ? "alert-danger" : type === "success" ? "alert-success" : type === "warning" ? "alert-warning" : "alert-info";
+        const el = document.createElement("div");
+        el.className = `alert ${cls} alert-dismissible fade show`;
+        el.innerHTML = `${msg}<button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>`;
+        statusMessages.appendChild(el);
+        setTimeout(() => el.remove(), 5000);
+    }
+
+    function showError(msg) { showStatusMessage(msg, "error"); }
+
+});
+</script>
+
+<style>
+.option-btn {
+    height: 60px;
+    font-size: 1.1rem;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.option-btn.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+#timer-container {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.list-group-item {
+    padding: 0.75rem 1.25rem;
+}
+
+.alert {
+    margin-bottom: 10px;
+}
+
+#round-results .alert { font-size: 1.1rem; }
+</style>
+{% endblock %}

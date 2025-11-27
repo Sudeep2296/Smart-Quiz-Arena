@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+
+{% block title %}Taking Quiz - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{{ quiz.title }}</h4>
+                    <div>
+                        <span class="badge bg-primary me-2">{{ quiz.topic.name }}</span>
+                        <span class="badge bg-secondary">{{ quiz.difficulty }}</span>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        Question <span id="current-question">1</span> of {{ quiz.questions.count }}
+                        | Time Remaining: <span id="time-remaining">{{ quiz.time_limit }}:00</span>
+                        {% if game_session.mode == 'multiplayer' %}
+                        | <span id="answered-count">0/0 players answered</span>
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="quiz-content">
+                    <!-- Quiz questions will be loaded here via JavaScript -->
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <button id="prev-btn" class="btn btn-secondary" disabled>
+                        <i class="fas fa-arrow-left"></i> Previous
+                    </button>
+                    <button id="next-btn" class="btn btn-primary">
+                        Next <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button id="submit-btn" class="btn btn-success d-none">
+                        <i class="fas fa-check"></i> Submit Quiz
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Bar -->
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="progress">
+            <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentQuestionIndex = 0;
+let answers = {};
+let timeRemaining = {{ quiz.time_limit }} * 60; // Convert to seconds
+let timer;
+{% if game_session.mode == 'multiplayer' %}
+let socket = null;
+let totalPlayers = 1;
+let answeredCount = 0;
+{% endif %}
+
+const questions = {{ questions_json|safe }};
+{% if game_session.mode == 'multiplayer' %}
+const isMultiplayer = true;
+{% else %}
+const isMultiplayer = false;
+{% endif %}
+
+// Check if questions exist - be very explicit about empty arrays
+if (!questions || !Array.isArray(questions) || questions.length === 0) {
+    document.getElementById('quiz-content').innerHTML = `
+        <div class="alert alert-warning text-center">
+            <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+            <h5>No Questions Available</h5>
+            <p>This quiz doesn't have any questions yet. Please try another quiz.</p>
+            <a href="{% url 'quiz_list' %}" class="btn btn-primary">Back to Quiz List</a>
+        </div>
+    `;
+    document.getElementById('prev-btn').style.display = 'none';
+    document.getElementById('next-btn').style.display = 'none';
+    document.getElementById('submit-btn').style.display = 'none';
+    // Stop execution here - don't define functions or initialize
+} else if (questions.length > 0) {
+    function displayQuestion(index) {
+        if (index < 0 || index >= questions.length) {
+            return;
+        }
+        
+        const question = questions[index];
+        if (!question) {
+            return;
+        }
+        
+        const quizContent = document.getElementById('quiz-content');
+
+        let html = `
+            <h5 class="mb-4">${question.question_text}</h5>
+            <div class="row">
+        `;
+
+        if (question.question_type === 'multiple_choice') {
+            question.answers.forEach((answer, i) => {
+                const checked = answers[question.id] === answer.id ? 'checked' : '';
+                html += `
+                    <div class="col-12 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="answer" value="${answer.id}" id="answer${i}" ${checked}>
+                            <label class="form-check-label" for="answer${i}">
+                                ${answer.answer_text}
+                            </label>
+                        </div>
+                    </div>
+                `;
+            });
+        } else if (question.question_type === 'true_false') {
+            const trueChecked = answers[question.id] === 'true' ? 'checked' : '';
+            const falseChecked = answers[question.id] === 'false' ? 'checked' : '';
+            html += `
+                <div class="col-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="answer" value="true" id="true" ${trueChecked}>
+                        <label class="form-check-label" for="true">True</label>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="answer" value="false" id="false" ${falseChecked}>
+                        <label class="form-check-label" for="false">False</label>
+                    </div>
+                </div>
+            `;
+        }
+
+        html += '</div>';
+        quizContent.innerHTML = html;
+
+        updateNavigation();
+        updateProgress();
+    }
+
+    function updateNavigation() {
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const submitBtn = document.getElementById('submit-btn');
+
+        prevBtn.disabled = currentQuestionIndex === 0;
+        nextBtn.style.display = currentQuestionIndex === questions.length - 1 ? 'none' : 'inline-block';
+        submitBtn.classList.toggle('d-none', currentQuestionIndex !== questions.length - 1);
+    }
+
+    function updateProgress() {
+        const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+        document.getElementById('progress-bar').style.width = progress + '%';
+        document.getElementById('current-question').textContent = currentQuestionIndex + 1;
+    }
+
+    function startTimer() {
+        timer = setInterval(() => {
+            timeRemaining--;
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            document.getElementById('time-remaining').textContent =
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (timeRemaining <= 0) {
+                clearInterval(timer);
+                submitQuiz();
+            }
+        }, 1000);
+    }
+
+    function submitQuiz() {
+        clearInterval(timer);
+
+        // Collect final answers
+        const radios = document.querySelectorAll('input[name="answer"]:checked');
+        radios.forEach(radio => {
+            const questionId = questions[currentQuestionIndex].id;
+            answers[questionId] = radio.value;
+        });
+
+        // Submit answers via AJAX
+        fetch('{% url "submit_quiz" quiz.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ answers: answers })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = data.redirect_url;
+            } else {
+                alert('Error submitting quiz. Please try again.');
+            }
+        });
+    }
+
+    // Event listeners
+    document.getElementById('prev-btn').addEventListener('click', () => {
+        if (currentQuestionIndex > 0) {
+            // Save current answer
+            const radios = document.querySelectorAll('input[name="answer"]:checked');
+            if (radios.length > 0) {
+                answers[questions[currentQuestionIndex].id] = radios[0].value;
+            }
+
+            currentQuestionIndex--;
+            displayQuestion(currentQuestionIndex);
+        }
+    });
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+        // Save current answer
+        const radios = document.querySelectorAll('input[name="answer"]:checked');
+        if (radios.length > 0) {
+            answers[questions[currentQuestionIndex].id] = radios[0].value;
+        }
+
+        if (isMultiplayer) {
+            // In multiplayer mode, submit answer and wait for all players
+            submitCurrentAnswer();
+        } else {
+            // In single player mode, proceed to next question
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                displayQuestion(currentQuestionIndex);
+            }
+        }
+    });
+
+    document.getElementById('submit-btn').addEventListener('click', submitQuiz);
+
+    // Initialize only if we have questions
+    if (questions && questions.length > 0) {
+        displayQuestion(0);
+        startTimer();
+    }
+}
+
+// Multiplayer-specific functions
+function initWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/quiz/{{ quiz.id }}/`;
+
+    socket = new WebSocket(wsUrl);
+
+    socket.onopen = function(event) {
+        console.log('Connected to quiz websocket');
+    };
+
+    socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        handleWebSocketMessage(data);
+    };
+
+    socket.onclose = function(event) {
+        console.log('Disconnected from quiz websocket');
+    };
+
+    socket.onerror = function(error) {
+        console.error('WebSocket error:', error);
+    };
+}
+
+function handleWebSocketMessage(data) {
+    switch(data.type) {
+        case 'quiz_start':
+            totalPlayers = data.total_players;
+            updateAnsweredCount(0, totalPlayers);
+            break;
+        case 'player_answered':
+            answeredCount = data.answered_count;
+            updateAnsweredCount(answeredCount, data.total_players);
+            break;
+        case 'next_question':
+            currentQuestionIndex = data.question_index;
+            timeRemaining = data.time_remaining;
+            answeredCount = 0;
+            updateAnsweredCount(0, totalPlayers);
+            displayQuestion(currentQuestionIndex);
+            break;
+        case 'quiz_finished':
+            alert(data.message);
+            window.location.href = '{% url "quiz_results" quiz.id %}';
+            break;
+        case 'error':
+            alert(data.message);
+            break;
+    }
+}
+
+function submitCurrentAnswer() {
+    const radios = document.querySelectorAll('input[name="answer"]:checked');
+    if (radios.length > 0) {
+        const answer = radios[0].value;
+        socket.send(JSON.stringify({
+            'type': 'submit_answer',
+            'question_index': currentQuestionIndex,
+            'answer': answer
+        }));
+    }
+}
+
+function updateAnsweredCount(count, total) {
+    document.getElementById('answered-count').textContent = `${count}/${total} players answered`;
+}
+
+// Initialize WebSocket for multiplayer if in multiplayer mode
+if (isMultiplayer) {
+    initWebSocket();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+
+{% block title %}Quiz Results - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="text-center mb-4">
+            <h2><i class="fas fa-trophy"></i> Quiz Results</h2>
+            <p class="text-muted">{{ quiz.title }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body text-center">
+                <!-- Score Display -->
+                <div class="mb-4">
+                    <div class="score-circle mx-auto mb-3"
+                        style="width: 150px; height: 150px; border-radius: 50%; border: 8px solid #007bff; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; color: #007bff;">
+                        {{ percentage }}%
+                    </div>
+                    <h4 class="text-{{ badge_class }}">{{ performance }}</h4>
+                </div>
+
+                <!-- Detailed Stats -->
+                <div class="row text-center mb-4">
+                    <div class="col-md-4">
+                        <h3 class="text-success">{{ game_session.score }}</h3>
+                        <p class="text-muted mb-0">Correct Answers</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3 class="text-danger">{{ incorrect_answers }}</h3>
+                        <p class="text-muted mb-0">Incorrect Answers</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3 class="text-info">{{ game_session.total_questions }}</h3>
+                        <p class="text-muted mb-0">Total Questions</p>
+                    </div>
+                </div>
+
+                <!-- Quiz Details -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title"><i class="fas fa-brain"></i> Topic</h6>
+                                <p class="mb-0">{{ quiz.topic.name }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title"><i class="fas fa-chart-line"></i> Difficulty</h6>
+                                <p class="mb-0">{{ quiz.difficulty|title }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question Review -->
+                {% if questions %}
+                <div class="mt-5 text-start">
+                    <h4 class="mb-4 text-center"><i class="fas fa-book-open"></i> Question Review</h4>
+                    <div class="accordion" id="questionsAccordion">
+                        {% for q_data in questions %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
+                                    type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#collapse{{ forloop.counter }}"
+                                    aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                                    aria-controls="collapse{{ forloop.counter }}">
+                                    <span class="me-2">
+                                        {% if q_data.is_correct %}
+                                        <i class="fas fa-check-circle text-success"></i>
+                                        {% else %}
+                                        <i class="fas fa-times-circle text-danger"></i>
+                                        {% endif %}
+                                    </span>
+                                    <strong>Question {{ forloop.counter }}:</strong>
+                                    <span class="ms-2 text-truncate"
+                                        style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px;">
+                                        {{ q_data.question.question_text|striptags|truncatechars:60 }}
+                                    </span>
+                                </button>
+                            </h2>
+                            <div id="collapse{{ forloop.counter }}"
+                                class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                                aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#questionsAccordion">
+                                <div class="accordion-body">
+                                    <!-- Question Text -->
+                                    <div class="alert alert-light mb-3">
+                                        <h6 class="fw-bold mb-2">Question:</h6>
+                                        <div class="question-text">{{ q_data.question.question_text|linebreaksbr }}
+                                        </div>
+                                    </div>
+
+                                    <!-- Answer Status -->
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div
+                                                class="card {% if q_data.is_correct %}border-success{% else %}border-danger{% endif %}">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">
+                                                        <i class="fas fa-user"></i> Your Answer
+                                                    </h6>
+                                                    {% if q_data.user_selected %}
+                                                    <p
+                                                        class="mb-0 {% if q_data.is_correct %}text-success fw-bold{% else %}text-danger fw-bold{% endif %}">
+                                                        {{ q_data.user_selected }}
+                                                        {% if q_data.is_correct %}
+                                                        <i class="fas fa-check-circle ms-2"></i>
+                                                        {% else %}
+                                                        <i class="fas fa-times-circle ms-2"></i>
+                                                        {% endif %}
+                                                    </p>
+                                                    {% else %}
+                                                    <p class="mb-0 text-muted">Not answered</p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card border-success">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">
+                                                        <i class="fas fa-check-circle"></i> Correct Answer
+                                                    </h6>
+                                                    <p class="mb-0 text-success fw-bold">
+                                                        {{ q_data.correct_answer }}
+                                                        <i class="fas fa-check-circle ms-2"></i>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- All Options -->
+                                    {% if q_data.options %}
+                                    <h6 class="mb-2">All Options:</h6>
+                                    <ul class="list-group">
+                                        {% for option in q_data.options %}
+                                        <li class="list-group-item 
+                                            {% if option == q_data.correct_answer %}list-group-item-success
+                                            {% elif option == q_data.user_selected and not q_data.is_correct %}list-group-item-danger
+                                            {% endif %}">
+                                            {% if option == q_data.correct_answer %}
+                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                            {% elif option == q_data.user_selected and not q_data.is_correct %}
+                                            <i class="fas fa-times-circle text-danger me-2"></i>
+                                            {% else %}
+                                            <i class="far fa-circle text-muted me-2"></i>
+                                            {% endif %}
+                                            {{ option }}
+                                            {% if option == q_data.correct_answer %}
+                                            <span class="badge bg-success ms-2 float-end">Correct</span>
+                                            {% elif option == q_data.user_selected %}
+                                            <span
+                                                class="badge bg-{% if q_data.is_correct %}success{% else %}danger{% endif %} ms-2 float-end">Your
+                                                Answer</span>
+                                            {% endif %}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Multiplayer Leaderboard (if applicable) -->
+                {% if game_session.mode == 'multiplayer' and all_sessions %}
+                <div class="mt-5">
+                    <h4 class="mb-4"><i class="fas fa-trophy"></i> Results</h4>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Player</th>
+                                    <th>Score</th>
+                                    <th>Percentage</th>
+                                    <th>Completed At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for session in all_sessions %}
+                                <tr class="{% if session.is_current_user %}table-primary fw-bold{% endif %}">
+                                    <td>
+                                        {% if session.rank == 1 %}
+                                        <span class="badge bg-warning text-dark">🥇 #{{ session.rank }}</span>
+                                        {% elif session.rank == 2 %}
+                                        <span class="badge bg-secondary">🥈 #{{ session.rank }}</span>
+                                        {% elif session.rank == 3 %}
+                                        <span class="badge bg-warning" style="background-color: #cd7f32 !important;">🥉
+                                            #{{ session.rank }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">#{{ session.rank }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ session.user.username }}
+                                        {% if session.is_current_user %}
+                                        <span class="badge bg-primary ms-2">You</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ session.score }} / {{ session.total_questions }}</td>
+                                    <td>
+                                        <span
+                                            class="badge {% if session.percentage >= 90 %}bg-success{% elif session.percentage >= 70 %}bg-primary{% elif session.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ session.percentage }}%
+                                        </span>
+                                    </td>
+                                    <td>{{ session.completed_at|date:"M d, Y H:i" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-center gap-3 mt-4">
+                    <a href="{% url 'take_quiz' quiz.id %}" class="btn btn-outline-primary">
+                        <i class="fas fa-redo"></i> Retake Quiz
+                    </a>
+                    <a href="{% url 'home' %}" class="btn btn-success">
+                        <i class="fas fa-home"></i> Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .score-circle {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .question-text {
+        font-family: 'Courier New', monospace;
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        text-align: left;
+    }
+</style>
+
+{% endblock %}

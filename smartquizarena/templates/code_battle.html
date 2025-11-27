@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block title %}Coding Challenges - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4"><i class="fas fa-code"></i> Coding Challenges Arena</h2>
+        <p class="text-muted">Challenge yourself with coding problems in head-to-head battles!</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Create New Battle</h5>
+            </div>
+            <div class="card-body">
+                <form id="create-battle-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="num-questions" class="form-label">Number of Questions (1-10)</label>
+                        <select class="form-select" id="num-questions" name="num_questions" required>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="level-select" class="form-label">Difficulty Level</label>
+                        <select class="form-select" id="level-select" name="level" required>
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-plus"></i> Create Battle
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Join Battle by Code</h5>
+            </div>
+            <div class="card-body">
+                <form id="join-battle-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="battle-code" class="form-label">Battle Code</label>
+                        <input type="text" class="form-control text-uppercase" id="battle-code"
+                            placeholder="Enter 6-character battle code" maxlength="6" required>
+                        <small class="form-text text-muted">Enter the battle code provided by the host</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-sign-in-alt"></i> Join Battle
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function getCSRFToken() {
+        const el = document.querySelector('[name=csrfmiddlewaretoken]');
+        return el ? el.value : '';
+    }
+
+    document.getElementById('create-battle-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = {
+            num_questions: parseInt(formData.get('num_questions')),
+            level: formData.get('level')
+        };
+
+        try {
+            const response = await fetch('/codebattle/battles/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Redirect to battle room instead of reloading
+                window.location.href = `/codebattle/room/${result.battle_code}/`;
+            } else {
+                alert(result.error || 'Failed to create battle');
+            }
+        } catch (error) {
+            alert('Error creating battle');
+        }
+    });
+
+    document.getElementById('join-battle-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const battleCode = document.getElementById('battle-code').value.toUpperCase().trim();
+
+        if (!battleCode || battleCode.length !== 6) {
+            alert('Please enter a valid 6-character battle code');
+            return;
+        }
+
+        try {
+            const response = await fetch('/codebattle/join-by-code/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ battle_code: battleCode })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Redirect to battle room instead of reloading
+                window.location.href = `/codebattle/room/${battleCode}/`;
+            } else {
+                alert(result.message || 'Failed to join battle');
+            }
+        } catch (error) {
+            alert('Error joining battle');
+        }
+    });
+
+    document.getElementById('battle-code').addEventListener('input', function (e) {
+        e.target.value = e.target.value.toUpperCase();
+    });
+
+    // Populate number of questions dropdown
+    document.addEventListener('DOMContentLoaded', function () {
+        const numQuestionsSelect = document.getElementById('num-questions');
+        if (numQuestionsSelect) {
+            for (let i = 1; i <= 10; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                if (i === 5) {
+                    option.selected = true;
+                }
+                numQuestionsSelect.appendChild(option);
+            }
+        }
+    });
+</script>
+{% endblock %}

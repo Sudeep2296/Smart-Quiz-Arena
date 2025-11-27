@@ -1,0 +1,402 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Profile - SmartQuiz Arena{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Profile Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card profile-header-card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-2 text-center">
+                            <div class="avatar-container">
+                                <img src="{% if user.avatar %}{{ user.avatar.url }}{% else %}https://ui-avatars.com/api/?name={{ user.username }}&background=007bff&color=fff&size=120{% endif %}"
+                                    alt="Avatar" class="profile-avatar">
+                                <div class="level-badge">Level {{ user.level }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <h2 class="mb-1 text-white">{{ user.username }}</h2>
+                            <p class="text-white-50 mb-2"><i class="fas fa-envelope"></i> {{ user.email }}</p>
+                            <div class="d-flex gap-3 flex-wrap">
+                                <span class="badge bg-white text-primary"><i class="fas fa-trophy"></i> {{
+                                    user.total_score }} Points</span>
+                                <span class="badge bg-white text-success"><i class="fas fa-fire"></i> {{ streak }} Day
+                                    Streak</span>
+                                <span class="badge bg-white text-info"><i class="fas fa-star"></i> {{
+                                    achievements|length }} Achievements</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="xp-circle">
+                                <svg class="xp-circle-svg" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.2)"
+                                        stroke-width="10" />
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="white" stroke-width="10"
+                                        stroke-dasharray="{{ progress_percentage }} {{ 100|add:"
+                                        -"|add:progress_percentage }}" stroke-linecap="round"
+                                        transform="rotate(-90 50 50)" />
+                                </svg>
+                                <div class="xp-circle-text">
+                                    <div class="xp-value">{{ user.xp }}</div>
+                                    <div class="xp-label">XP</div>
+                                </div>
+                            </div>
+                            <small class="text-white-50">{{ xp_to_next_level }} XP to Level {{ user.level|add:1
+                                }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="stat-card h-100">
+                <div class="stat-icon bg-primary">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-number">{{ total_quizzes }}</h3>
+                    <p class="stat-label">Quizzes Completed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="stat-card h-100">
+                <div class="stat-icon bg-success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-number">{{ accuracy }}%</h3>
+                    <p class="stat-label">Accuracy Rate</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="stat-card h-100">
+                <div class="stat-icon bg-warning">
+                    <i class="fas fa-code"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-number">{{ code_battles }}</h3>
+                    <p class="stat-label">Coding Challenges</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="stat-card h-100">
+                <div class="stat-icon bg-info">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-number">{{ multiplayer_games }}</h3>
+                    <p class="stat-label">Multiplayer Games</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Activity -->
+        <div class="col-md-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_sessions %}
+                    <div class="activity-timeline">
+                        {% for session in recent_sessions %}
+                        <div class="timeline-item">
+                            <div
+                                class="timeline-marker {% if session.score >= 8 %}bg-success{% elif session.score >= 5 %}bg-primary{% else %}bg-warning{% endif %}">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ session.quiz.title }}</h6>
+                                        <p class="text-muted small mb-1">
+                                            <span class="badge bg-light text-dark">{{ session.quiz.difficulty|title
+                                                }}</span>
+                                            <span class="badge bg-light text-dark">{{ session.quiz.topic.name }}</span>
+                                        </p>
+                                        <p class="small text-muted mb-0">
+                                            <i class="far fa-clock"></i> {{ session.completed_at|timesince }} ago
+                                        </p>
+                                    </div>
+                                    <div class="text-end">
+                                        <div
+                                            class="score-badge {% if session.score >= 8 %}text-success{% elif session.score >= 5 %}text-primary{% else %}text-warning{% endif %}">
+                                            {{ session.score }}/{{ session.total_questions }}
+                                        </div>
+                                        <small class="text-muted">{{ session.percentage }}%</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>No recent activity yet. Start a quiz to see your progress!</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Achievements & Rankings -->
+        <div class="col-md-4">
+            <!-- Global Ranking -->
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-trophy"></i> Global Ranking</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="ranking-circle">
+                        <h2 class="text-warning mb-0">#{{ global_rank }}</h2>
+                        <p class="text-muted small">of {{ total_users }} players</p>
+                    </div>
+                    <a href="{% url 'leaderboard' %}" class="btn btn-outline-primary btn-sm mt-2">
+                        <i class="fas fa-chart-bar"></i> View Leaderboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Top Achievements -->
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-medal"></i> Latest Achievements</h5>
+                </div>
+                <div class="card-body">
+                    {% if achievements %}
+                    {% for achievement in achievements|slice:":4" %}
+                    <div class="achievement-item">
+                        <div class="achievement-icon">
+                            <i class="fas fa-medal text-warning"></i>
+                        </div>
+                        <div class="achievement-details">
+                            <h6 class="mb-0">{{ achievement.badge.name }}</h6>
+                            <small class="text-muted">{{ achievement.earned_at|date:"M d, Y" }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <a href="{% url 'gamification:achievement-list' %}"
+                        class="btn btn-outline-secondary btn-sm w-100 mt-3">
+                        View All Achievements
+                    </a>
+                    {% else %}
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-star fa-2x mb-2"></i>
+                        <p class="small mb-0">No achievements yet!<br>Complete challenges to earn badges.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .profile-header-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+    }
+
+    .avatar-container {
+        position: relative;
+        display: inline-block;
+    }
+
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 4px solid white;
+        object-fit: cover;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .level-badge {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: #ffc107;
+        color: #000;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.85rem;
+        border: 2px solid white;
+    }
+
+    .xp-circle {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        margin: 0 auto;
+    }
+
+    .xp-circle-svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    .xp-circle-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    .xp-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: white;
+    }
+
+    .xp-label {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .stat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .stat-content {
+        flex: 1;
+    }
+
+    .stat-number {
+        font-size: 1.75rem;
+        font-weight: bold;
+        margin-bottom: 0;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        margin-bottom: 0;
+        font-size: 0.875rem;
+    }
+
+    .activity-timeline {
+        position: relative;
+    }
+
+    .timeline-item {
+        position: relative;
+        padding-left: 50px;
+        padding-bottom: 25px;
+    }
+
+    .timeline-item:last-child {
+        padding-bottom: 0;
+    }
+
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: 19px;
+        top: 30px;
+        bottom: -25px;
+        width: 2px;
+        background: #e9ecef;
+    }
+
+    .timeline-item:last-child::before {
+        display: none;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.875rem;
+    }
+
+    .timeline-content {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+    }
+
+    .score-badge {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .ranking-circle {
+        padding: 20px;
+    }
+
+    .achievement-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .achievement-item:last-child {
+        border-bottom: none;
+    }
+
+    .achievement-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #fff3cd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .achievement-details {
+        flex: 1;
+    }
+
+    .achievement-details h6 {
+        font-size: 0.9rem;
+    }
+
+    .badge {
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
