@@ -25,37 +25,31 @@ A Django-based quiz application with multiplayer and code battle features.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Sudeep2296/smartquizarena.git
+   git clone https://github.com/Sudeep2296/Smart-Quiz-arena.git
    cd smartquizarena
    ```
 
-2. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. Install dependencies:
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Set up environment variables:
+3. Set up environment variables:
    - Copy `.env` and configure your settings
    - Set `GEMINI_API_KEY` for AI-generated questions
    - Configure `JUDGE0_API_KEY` for code execution
 
-5. Run migrations:
+4. Run migrations:
    ```bash
    python manage.py migrate
    ```
 
-6. Create a superuser:
+5. Create a superuser:
    ```bash
    python manage.py createsuperuser
    ```
 
-7. Run the development server:
+6. Run the development server:
    ```bash
 <<<<<<< HEAD
    python manage.py runserver

@@ -39,7 +39,8 @@ import random
 # Configure Gemini API (optional)
 try:
     import google.generativeai as genai
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    from django.conf import settings
+    genai.configure(api_key=settings.GEMINI_API_KEY)
 except ImportError:
     genai = None
 
