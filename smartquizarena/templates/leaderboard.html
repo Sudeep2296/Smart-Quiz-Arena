@@ -3,46 +3,283 @@
 {% block title %}Leaderboard{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h1 class="text-center mb-4">Leaderboard</h1>
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Top Players</h5>
+<style>
+    .leaderboard-hero {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 24px;
+        padding: 3rem 2rem;
+        margin-bottom: 3rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .leaderboard-hero::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 300px;
+        height: 300px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+
+    .trophy-icon {
+        font-size: 4rem;
+        color: #fee140;
+        margin-bottom: 1rem;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    .podium-container {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 1rem;
+        margin-bottom: 3rem;
+    }
+
+    .podium-item {
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+
+    .podium-item:hover {
+        transform: translateY(-10px);
+    }
+
+    .podium-card {
+        background: white;
+        border-radius: 20px;
+        padding: 1.5rem;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .podium-card.gold {
+        border: 3px solid #FFD700;
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);
+    }
+
+    .podium-card.silver {
+        border: 3px solid #C0C0C0;
+        background: linear-gradient(135deg, rgba(192, 192, 192, 0.1) 0%, rgba(192, 192, 192, 0.05) 100%);
+    }
+
+    .podium-card.bronze {
+        border: 3px solid #CD7F32;
+        background: linear-gradient(135deg, rgba(205, 127, 50, 0.1) 0%, rgba(205, 127, 50, 0.05) 100%);
+    }
+
+    .medal {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.75rem;
+        font-weight: bold;
+        color: white;
+    }
+
+    .medal.gold {
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.5);
+    }
+
+    .medal.silver {
+        background: linear-gradient(135deg, #C0C0C0, #A0A0A0);
+        box-shadow: 0 4px 15px rgba(192, 192, 192, 0.5);
+    }
+
+    .medal.bronze {
+        background: linear-gradient(135deg, #CD7F32, #B8860B);
+        box-shadow: 0 4px 15px rgba(205, 127, 50, 0.5);
+    }
+
+    .rank-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .rank-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: 2px solid transparent;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #667eea, #764ba2) border-box;
+        -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+        mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .rank-card:hover::before {
+        opacity: 1;
+    }
+
+    .rank-card:hover {
+        transform: translateX(8px);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+    }
+
+    .rank-badge {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+
+    .stat-pill {
+        background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+        padding: 0.375rem 1rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+</style>
+
+<div class="container mt-4 animate-fade-in">
+    <!-- Hero Section -->
+    <div class="leaderboard-hero">
+        <div class="trophy-icon">
+            <i class="fas fa-trophy"></i>
+        </div>
+        <h1 class="text-white mb-2 fw-bold">Leaderboard</h1>
+        <p class="text-white-50 mb-0 fs-5">Compete with the best minds in SmartQuiz Arena</p>
+    </div>
+
+    {% if leaderboard|length > 0 %}
+    <!-- Top 3 Podium -->
+    {% if leaderboard|length >= 3 %}
+    <div class="podium-container animate-slide-up">
+        <!-- Second Place -->
+        <div class="podium-item" style="width: 200px;">
+            <div class="podium-card silver">
+                <div class="medal silver">2nd</div>
+                <h5 class="fw-bold mb-1">{{ leaderboard.1.username }}</h5>
+                <p class="text-muted small mb-2">Level {{ leaderboard.1.level }}</p>
+                <div class="stat-pill mb-2">
+                    <i class="fas fa-star text-warning me-1"></i>{{ leaderboard.1.total_score }} pts
                 </div>
-                <div class="card-body">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Rank</th>
-                                <th>Username</th>
-                                <th>Total Score</th>
-                                <th>Level</th>
-                                <th>XP</th>
-                                <th>Current Streak</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for user in leaderboard %}
-                            <tr>
-                                <td>{{ forloop.counter }}</td>
-                                <td>{{ user.username }}</td>
-                                <td>{{ user.total_score }}</td>
-                                <td>{{ user.level }}</td>
-                                <td>{{ user.xp }}</td>
-                                <td>{{ user.current_streak }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="6" class="text-center">No users found.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="stat-pill">
+                    <i class="fas fa-fire text-danger me-1"></i>{{ leaderboard.1.current_streak }} streak
+                </div>
+            </div>
+        </div>
+
+        <!-- First Place -->
+        <div class="podium-item" style="width: 220px;">
+            <div class="podium-card gold">
+                <div class="medal gold">1st</div>
+                <h4 class="fw-bold mb-1">{{ leaderboard.0.username }}</h4>
+                <p class="text-muted small mb-2">Level {{ leaderboard.0.level }}</p>
+                <div class="stat-pill mb-2">
+                    <i class="fas fa-star text-warning me-1"></i>{{ leaderboard.0.total_score }} pts
+                </div>
+                <div class="stat-pill">
+                    <i class="fas fa-fire text-danger me-1"></i>{{ leaderboard.0.current_streak }} streak
+                </div>
+            </div>
+        </div>
+
+        <!-- Third Place -->
+        <div class="podium-item" style="width: 180px;">
+            <div class="podium-card bronze">
+                <div class="medal bronze">3rd</div>
+                <h6 class="fw-bold mb-1">{{ leaderboard.2.username }}</h6>
+                <p class="text-muted small mb-2">Level {{ leaderboard.2.level }}</p>
+                <div class="stat-pill mb-2">
+                    <i class="fas fa-star text-warning me-1"></i>{{ leaderboard.2.total_score }} pts
+                </div>
+                <div class="stat-pill">
+                    <i class="fas fa-fire text-danger me-1"></i>{{ leaderboard.2.current_streak }} streak
                 </div>
             </div>
         </div>
     </div>
+    {% endif %}
+
+    <!-- Rest of Leaderboard -->
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h4 class="mb-4 fw-bold gradient-text">All Rankings</h4>
+            {% for user in leaderboard %}
+            {% if forloop.counter > 3 %}
+            <div class="rank-card">
+                <div class="d-flex align-items-center">
+                    <div class="rank-badge me-3">
+                        {{ forloop.counter }}
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1 fw-bold">{{ user.username }}</h6>
+                        <small class="text-muted">Level {{ user.level }} • {{ user.xp }} XP</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="stat-pill mb-1">
+                            <i class="fas fa-trophy text-warning me-1"></i>{{ user.total_score }}
+                        </div>
+                        <div class="stat-pill">
+                            <i class="fas fa-fire text-danger me-1"></i>{{ user.current_streak }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            <!-- Show top 3 in list too if needed -->
+            {% if leaderboard|length <= 3 %} {% for user in leaderboard %} <div class="rank-card">
+                <div class="d-flex align-items-center">
+                    <div class="rank-badge me-3">
+                        {{ forloop.counter }}
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1 fw-bold">{{ user.username }}</h6>
+                        <small class="text-muted">Level {{ user.level }} • {{ user.xp }} XP</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="stat-pill mb-1">
+                            <i class="fas fa-trophy text-warning me-1"></i>{{ user.total_score }}
+                        </div>
+                        <div class="stat-pill">
+                            <i class="fas fa-fire text-danger me-1"></i>{{ user.current_streak }}
+                        </div>
+                    </div>
+                </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-users fa-4x text-muted mb-3"></i>
+    <h4 class="text-muted">No players found</h4>
+    <p class="text-muted">Be the first to join the leaderboard!</p>
+</div>
+{% endif %}
 </div>
 {% endblock %}

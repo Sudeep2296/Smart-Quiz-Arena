@@ -3,31 +3,82 @@
 {% block title %}Login - SmartQuiz Arena{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header text-center">
-                <h3><i class="fas fa-sign-in-alt"></i> Login to SmartQuiz Arena</h3>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Login</button>
-                    </div>
-                </form>
-                <div class="text-center mt-3">
-                    <p>Don't have an account? <a href="{% url 'register' %}">Register here</a></p>
+<style>
+    .login-wrapper {
+        min-height: calc(100vh - 200px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+
+    .login-card {
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.95);
+        max-width: 480px;
+        width: 100%;
+    }
+
+    .login-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2.5rem 2rem;
+        text-align: center;
+    }
+
+    .input-group-custom {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+
+    .input-group-custom i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #667eea;
+        z-index: 10;
+    }
+
+    .input-group-custom input {
+        padding-left: 3rem;
+    }
+</style>
+
+<div class="login-wrapper animate-fade-in">
+    <div class="login-card">
+        <div class="login-header">
+            <i class="fas fa-brain fa-3x text-white mb-3"></i>
+            <h2 class="text-white mb-1">Welcome Back!</h2>
+            <p class="text-white-50 mb-0">Login to SmartQuiz Arena</p>
+        </div>
+        <div class="p-4">
+            <form method="post">
+                {% csrf_token %}
+                <div class="input-group-custom">
+                    <i class="fas fa-user"></i>
+                    <input type="text" class="form-control" id="username" name="username"
+                        placeholder="Enter your username" required autofocus>
                 </div>
-            </div>
+                <div class="input-group-custom">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" class="form-control" id="password" name="password"
+                        placeholder="Enter your password" required>
+                </div>
+                <div class="d-grid mb-3">
+                    <button type="submit" class="btn btn-primary py-3">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login to Your Account
+                    </button>
+                </div>
+                <div class="text-center">
+                    <p class="text-muted">Don't have an account?
+                        <a href="{% url 'register' %}" class="fw-bold gradient-text text-decoration-none">Register
+                            here</a>
+                    </p>
+                </div>
+            </form>
         </div>
     </div>
 </div>

@@ -30,8 +30,8 @@ def get_gemini_model(model_name: str):
 
 class GeminiQuestionGenerator:
     def __init__(self):
-        # Use standard flash model for better instruction following while maintaining speed
-        self.model_name = "gemini-1.5-flash"
+        # Use gemini-2.5-flash which is available and fast
+        self.model_name = "models/gemini-2.5-flash"
         self.model = get_gemini_model(self.model_name)
 
     def list_available_models(self):
@@ -158,7 +158,7 @@ Requirements:
                 response = self.model.generate_content(
                     prompt, 
                     stream=True,
-                    request_options={"timeout": 30}  # 30 second timeout
+                    request_options={"timeout": 60}  # 60 second timeout
                 )
                 chunks = []
                 for chunk in response:
@@ -339,7 +339,7 @@ Requirements:
                     response = self.model.generate_content(
                         prompt, 
                         stream=True,
-                        request_options={"timeout": 30}
+                        request_options={"timeout": 60}
                     )
                     chunks = []
                     for chunk in response:
@@ -450,24 +450,24 @@ Requirements:
         Try switching to an alternative working model, using cached instances.
         """
         alternative_models = [
-            "gemini-2.0-flash",
-            "gemini-1.5-pro",
-            "gemini-pro",
+            "models/gemini-flash-latest",
+            "models/gemini-pro-latest",
+            "models/gemini-2.0-flash",
         ]
 
         for alt_model in alternative_models:
-            for variant in (alt_model, f"models/{alt_model}"):
-                try:
-                    test_model = get_gemini_model(variant)
-                    # Quick lightweight test
-                    resp = test_model.generate_content("test", stream=False)
-                    if hasattr(resp, "text"):
-                        self.model = test_model
-                        self.model_name = variant
-                        print(f"Successfully switched to model: {variant}")
-                        return True
-                except Exception:
-                    continue
+            try:
+                test_model = get_gemini_model(alt_model)
+                # Quick lightweight test
+                resp = test_model.generate_content("test", stream=False)
+                if hasattr(resp, "text"):
+                    self.model = test_model
+                    self.model_name = alt_model
+                    print(f"Successfully switched to model: {alt_model}")
+                    return True
+            except Exception as e:
+                print(f"Fallback model {alt_model} failed: {e}")
+                continue
         print("No fallback Gemini model worked.")
         return False
 
@@ -593,3 +593,160 @@ class QuizGenerationService:
             quiz.save()
 
         return quiz
+
+
+# ==========================
+# Progressive Quiz Generation Service
+# ==========================
+
+class ProgressiveQuizGenerationService:
+    """
+    Generates quizzes progressively: creates initial questions immediately,
+    then continues generating remaining questions in the background.
+    """
+    def __init__(self):
+        self.question_generator = GeminiQuestionGenerator()
+
+    def generate_quiz_progressive(
+        self,
+        topic_id,
+        num_questions=10,
+        difficulty="medium",
+        user=None,
+        initial_timeout=30,
+        callback=None,
+    ):
+        """
+        Generate quiz with all questions in a single batch.
+        No progressive loading - waits for all questions before returning.
+        
+        Args:
+            topic_id: Topic ID
+            num_questions: Total number of questions desired
+            difficulty: Difficulty level
+            user: User creating the quiz
+            initial_timeout: Timeout for generation (seconds)
+            callback: Optional callback function (not used in batch mode)
+        
+        Returns:
+            Quiz object with all questions
+        """
+        if not user:
+            raise ValueError("User is required to create the quiz")
+
+        topic = Topic.objects.get(id=topic_id)
+        
+        # Generate ALL questions in one batch
+        # Scale timeout based on number of questions (base 30s + 6s per question)
+        actual_timeout = min(120, 30 + (num_questions * 6))
+        print(f"Batch generating all {num_questions} questions (timeout: {actual_timeout}s)")
+        
+        # Generate all questions in initial batch
+        initial_questions = self._generate_initial_batch(
+            topic, difficulty, num_questions, actual_timeout
+        )
+        
+        if not initial_questions:
+            raise ValueError("Failed to generate initial questions")
+        
+        # Create quiz with all questions (no background generation)
+        quiz = self._create_quiz_with_questions(
+            topic, difficulty, user, num_questions, initial_questions
+        )
+        
+        return quiz
+    
+    def _generate_initial_batch(self, topic, difficulty, count, timeout):
+        """Generate initial batch of questions with timeout."""
+        result = [None]
+        exception = [None]
+        
+        def generate():
+            try:
+                questions_data = self.question_generator.generate_questions(
+                    topic=topic.name,
+                    difficulty=difficulty,
+                    num_questions=count,
+                )
+                result[0] = questions_data
+            except Exception as e:
+                exception[0] = e
+        
+        thread = threading.Thread(target=generate, daemon=True)
+        thread.start()
+        thread.join(timeout)
+        
+        if thread.is_alive():
+            print(f"Initial batch generation timed out after {timeout}s")
+            return None
+        
+        if exception[0]:
+            print(f"Initial batch generation failed: {exception[0]}")
+            return None
+        
+        return result[0]
+    
+    def _create_quiz_with_questions(self, topic, difficulty, user, total_questions, questions_data):
+        """Create quiz and add initial questions."""
+        with transaction.atomic():
+            quiz = Quiz.objects.create(
+                title=f"{topic.name} Quiz - {difficulty.capitalize()} Level",
+                description=(
+                    f"AI-generated quiz on {topic.name} "
+                    f"with {total_questions} questions."
+                ),
+                topic=topic,
+                created_by=user,
+                difficulty=difficulty,
+                time_limit=total_questions * 2,  # 2 minutes per question
+            )
+            
+            for q_data in questions_data:
+                Question.objects.create(
+                    quiz=quiz,
+                    question_text=q_data["question"],
+                    question_type="multiple_choice",
+                    options=q_data["options"],
+                    correct_answer=q_data["correct_answer"],
+                    points=1,
+                    is_ai_generated=True,
+                )
+            
+            quiz.save()
+        
+        return quiz
+    
+    def _generate_remaining_background(self, quiz_id, topic_name, difficulty, count, callback):
+        """Generate remaining questions in background and add to quiz."""
+        try:
+            print(f"Background: Generating {count} remaining questions...")
+            questions_data = self.question_generator.generate_questions(
+                topic=topic_name,
+                difficulty=difficulty,
+                num_questions=count,
+            )
+            
+            if questions_data:
+                with transaction.atomic():
+                    quiz = Quiz.objects.get(id=quiz_id)
+                    for q_data in questions_data:
+                        Question.objects.create(
+                            quiz=quiz,
+                            question_text=q_data["question"],
+                            question_type="multiple_choice",
+                            options=q_data["options"],
+                            correct_answer=q_data["correct_answer"],
+                            points=1,
+                            is_ai_generated=True,
+                        )
+                
+                print(f"Background: Successfully added {len(questions_data)} questions to quiz {quiz_id}")
+                
+                # Call callback if provided (for WebSocket notifications)
+                if callback:
+                    callback(quiz_id, questions_data)
+            else:
+                print(f"Background: Failed to generate remaining questions for quiz {quiz_id}")
+        
+        except Exception as e:
+            print(f"Background: Error generating remaining questions: {e}")

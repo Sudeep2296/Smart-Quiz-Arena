@@ -46,16 +46,28 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
+    # Helper methods for reducing code duplication
+    async def send_error(self, message):
+        """Send error message to client"""
+        await self.send(json.dumps({"type": "error", "message": message}))
+
+    async def broadcast_to_group(self, event_type, **data):
+        """Broadcast event to all clients in the room"""
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {'type': event_type, **data}
+        )
+
     async def receive(self, text_data):
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
-            await self.send(json.dumps({"type": "error", "message": "Invalid JSON"}))
+            await self.send_error("Invalid JSON")
             return
 
         user = self.scope["user"]
         if not user.is_authenticated:
-            await self.send(json.dumps({"type": "error", "message": "Authentication required"}))
+            await self.send_error("Authentication required")
             return
 
         msg_type = data.get("type")
@@ -70,7 +82,7 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
     async def handle_toggle_ready(self, user, data):
         room_id = data.get('room_id')
         if not room_id:
-            await self.send(json.dumps({"type": "error", "message": "Room ID required"}))
+            await self.send_error("Room ID required")
             return
 
         try:
@@ -78,7 +90,7 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
             player = await self.get_player(user.id, room_id)
 
             if not player:
-                await self.send(json.dumps({"type": "error", "message": "Player not in room"}))
+                await self.send_error("Player not in room")
                 return
 
             # Toggle ready status
@@ -86,22 +98,19 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
             await self.save_player(player)
 
             # Broadcast the change
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'player_ready',
-                    'message': f'{user.username} is {"ready" if player.is_ready else "not ready"}',
-                    'room': await self.get_room_data(room_id)
-                }
+            await self.broadcast_to_group(
+                'player_ready',
+                message=f'{user.username} is {"ready" if player.is_ready else "not ready"}',
+                room=await self.get_room_data(room_id)
             )
 
         except Exception as e:
-            await self.send(json.dumps({"type": "error", "message": str(e)}))
+            await self.send_error(str(e))
 
     async def handle_start_game(self, user, data):
         room_id = data.get('room_id')
         if not room_id:
-            await self.send(json.dumps({"type": "error", "message": "Room ID required"}))
+            await self.send_error("Room ID required")
             return
 
         try:
@@ -109,29 +118,27 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
             player = await self.get_player(user.id, room_id)
 
             if not player:
-                await self.send(json.dumps({"type": "error", "message": "Player not in room"}))
+                await self.send_error("Player not in room")
                 return
 
             # Check if user is host
             if room.host_id != user.id:
-                await self.send(json.dumps({"type": "error", "message": "Only host can start the game"}))
+                await self.send_error("Only host can start the game")
                 return
 
             # Check if all players are ready
             players = await self.get_room_players(room_id)
             if not all(p.is_ready for p in players):
-                await self.send(json.dumps({"type": "error", "message": "All players must be ready to start"}))
+                await self.send_error("All players must be ready to start")
                 return
 
             # Check minimum players
             if len(players) < 2:
-                await self.send(json.dumps({"type": "error", "message": "Need at least 2 players to start"}))
+                await self.send_error("Need at least 2 players to start")
                 return
 
-            # Generate quiz and start game
-            from quizzes.services import QuizGenerationService
-            quiz_service = QuizGenerationService()
-            quiz = await self.generate_quiz(room.topic_id, room.num_questions, room.level, user)
+            # Generate quiz progressively (initial questions immediately, rest in background)
+            quiz = await self.generate_quiz_progressive(room.topic_id, room.num_questions, room.level, user)
 
             # Update room state
             room.quiz_id = quiz.id
@@ -140,22 +147,19 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
             await self.save_room(room)
 
             # Broadcast game started
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'game_started',
-                    'message': 'Game started!',
-                    'quiz_id': quiz.id
-                }
+            await self.broadcast_to_group(
+                'game_started',
+                message='Game started!',
+                quiz_id=quiz.id
             )
 
         except Exception as e:
-            await self.send(json.dumps({"type": "error", "message": str(e)}))
+            await self.send_error(str(e))
 
     async def handle_leave_room(self, user, data):
         room_id = data.get('room_id')
         if not room_id:
-            await self.send(json.dumps({"type": "error", "message": "Room ID required"}))
+            await self.send_error("Room ID required")
             return
 
         try:
@@ -163,7 +167,7 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
             player = await self.get_player(user.id, room_id)
 
             if not player:
-                await self.send(json.dumps({"type": "error", "message": "Player not in room"}))
+                await self.send_error("Player not in room")
                 return
 
             # If player is host and there are other players, assign new host
@@ -183,19 +187,16 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
                 await self.delete_room(room)
             else:
                 # Broadcast player left
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        'type': 'player_left',
-                        'message': f'{user.username} left the room',
-                        'room': await self.get_room_data(room_id)
-                    }
+                await self.broadcast_to_group(
+                    'player_left',
+                    message=f'{user.username} left the room',
+                    room=await self.get_room_data(room_id)
                 )
 
             await self.send(json.dumps({"type": "success", "message": "Left room successfully"}))
 
         except Exception as e:
-            await self.send(json.dumps({"type": "error", "message": str(e)}))
+            await self.send_error(str(e))
 
     # Event handlers for group messages
     async def player_joined(self, event):
@@ -275,14 +276,24 @@ class QuizRoomConsumer(AsyncWebsocketConsumer):
         room.delete()
 
     @database_sync_to_async
-    def generate_quiz(self, topic_id, num_questions, difficulty, user):
-        from quizzes.services import QuizGenerationService
-        quiz_service = QuizGenerationService()
-        return quiz_service.generate_quiz(
+    def generate_quiz_progressive(self, topic_id, num_questions, difficulty, user):
+        from quizzes.services import ProgressiveQuizGenerationService
+        quiz_service = ProgressiveQuizGenerationService()
+        
+        # Define callback to notify when new questions are generated
+        def on_questions_added(quiz_id, questions_data):
+            # This will be called from background thread
+            # We can't directly call async methods, so we'll just log for now
+            # The frontend will refetch quiz data when needed
+            print(f"Background: {len(questions_data)} new questions added to quiz {quiz_id}")
+        
+        return quiz_service.generate_quiz_progressive(
             topic_id=topic_id,
             num_questions=num_questions,
             difficulty=difficulty,
-            user=user
+            user=user,
+            initial_timeout=30,  # 30 seconds for adaptive batch
+            callback=on_questions_added
         )
 
 class GeoGuessrQuizConsumer(AsyncWebsocketConsumer):

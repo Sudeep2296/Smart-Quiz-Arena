@@ -3,7 +3,7 @@ Sum of Two Numbers
 
 Description: Given two integers a and b, print their sum.
 Difficulty: Easy
-Time Limit: 5 seconds
+Time Limit: 300 seconds
 Language: Python
 Reference Solution:
 
@@ -19,7 +19,7 @@ Count Vowels in a String
 
 Description: Given a lowercase string s, count the number of vowels (a, e, i, o, u).
 Difficulty: Easy
-Time Limit: 5 seconds
+Time Limit:  seconds
 Language: Python
 Reference Solution:
 

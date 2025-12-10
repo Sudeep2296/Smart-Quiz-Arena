@@ -6,6 +6,25 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from .models import Room, Player
 from .serializers import RoomSerializer, PlayerSerializer
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+
+def _broadcast_room_event(room_code, event_type, message, room_data=None, extra_data=None):
+    """Helper function to broadcast events to a room via WebSocket."""
+    channel_layer = get_channel_layer()
+    event_data = {
+        'type': event_type,
+        'message': message
+    }
+    if room_data is not None:
+        event_data['room'] = room_data
+    if extra_data is not None:
+        event_data.update(extra_data)
+    async_to_sync(channel_layer.group_send)(
+        f'quiz_room_{room_code}',
+        event_data
+    )
 
 @login_required
 def multiplayer_home(request):
@@ -55,16 +74,11 @@ class JoinByCodeView(APIView):
                 player, created = Player.objects.get_or_create(user=request.user, room=room)
                 if created:
                     # Broadcast player joined
-                    from channels.layers import get_channel_layer
-                    from asgiref.sync import async_to_sync
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f'quiz_room_{room.room_code}',
-                        {
-                            'type': 'player_joined',
-                            'message': f'{request.user.username} joined the room',
-                            'room': RoomSerializer(room).data
-                        }
+                    _broadcast_room_event(
+                        room.room_code,
+                        'player_joined',
+                        f'{request.user.username} joined the room',
+                        RoomSerializer(room).data
                     )
                     # Return room data for frontend to display
                     serializer = RoomSerializer(room)
@@ -94,16 +108,11 @@ class ToggleReadyView(APIView):
             player.save()
 
             # Broadcast the change via WebSocket
-            from channels.layers import get_channel_layer
-            from asgiref.sync import async_to_sync
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f'quiz_room_{room.room_code}',
-                {
-                    'type': 'player_ready',
-                    'message': f'{player.user.username} is {"ready" if player.is_ready else "not ready"}',
-                    'room': RoomSerializer(room).data
-                }
+            _broadcast_room_event(
+                room.room_code,
+                'player_ready',
+                f'{player.user.username} is {"ready" if player.is_ready else "not ready"}',
+                RoomSerializer(room).data
             )
 
             return Response({'is_ready': player.is_ready}, status=status.HTTP_200_OK)
@@ -146,16 +155,16 @@ class StartGameView(APIView):
             room.quiz_state = 'active'
             room.save()
 
-            # Generate quiz and broadcast
+            # Generate quiz progressively (initial questions immediately, rest in background)
             try:
-                from quizzes.services import QuizGenerationService
-                quiz_service = QuizGenerationService()
-                quiz = quiz_service.generate_quiz(
+                from quizzes.services import ProgressiveQuizGenerationService
+                quiz_service = ProgressiveQuizGenerationService()
+                quiz = quiz_service.generate_quiz_progressive(
                     topic_id=room.topic_id,
                     num_questions=room.num_questions,
                     difficulty=room.level,
                     user=request.user,
-                    timeout=120  # Increased timeout to 120 seconds for multiplayer
+                    initial_timeout=30  # 30 seconds for initial batch (adaptive sizing)
                 )
             except Exception as e:
                 return Response({'error': f'Failed to generate quiz: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -174,16 +183,12 @@ class StartGameView(APIView):
             room.save()
 
             # Broadcast game started
-            from channels.layers import get_channel_layer
-            from asgiref.sync import async_to_sync
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f'quiz_room_{room.room_code}',
-                {
-                    'type': 'game_started',
-                    'message': 'Game started!',
-                    'quiz_id': quiz.id
-                }
+            _broadcast_room_event(
+                room.room_code,
+                'game_started',
+                'Game started!',
+                None,
+                {'quiz_id': quiz.id}
             )
 
             return Response({'message': 'Game started successfully', 'quiz_id': quiz.id}, status=status.HTTP_200_OK)
@@ -220,16 +225,11 @@ class LeaveRoomView(APIView):
                 room.delete()
             else:
                 # Broadcast player left
-                from channels.layers import get_channel_layer
-                from asgiref.sync import async_to_sync
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f'quiz_room_{room.room_code}',
-                    {
-                        'type': 'player_left',
-                        'message': f'{player.user.username} left the room',
-                        'room': RoomSerializer(room).data
-                    }
+                _broadcast_room_event(
+                    room.room_code,
+                    'player_left',
+                    f'{player.user.username} left the room',
+                    RoomSerializer(room).data
                 )
 
             return Response({'message': 'Left room successfully'}, status=status.HTTP_200_OK)

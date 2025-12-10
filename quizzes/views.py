@@ -12,6 +12,16 @@ from .serializers import TopicSerializer, QuizSerializer, QuestionSerializer, Ga
 from .services import GeminiQuestionGenerator
 from gamification.services import AchievementService
 
+
+def _determine_game_mode(quiz):
+    """Helper function to determine if a quiz is part of a multiplayer session."""
+    try:
+        from multiplayer.models import Room
+        room = Room.objects.filter(quiz=quiz, is_active=True).first()
+        return 'multiplayer' if room else 'single'
+    except Exception:
+        return 'single'
+
 @login_required
 def quiz_list(request):
     quizzes = Quiz.objects.all()
@@ -83,15 +93,7 @@ def take_quiz(request, quiz_id):
     
     if not active_session:
         # Create session if it doesn't exist (fallback for direct access)
-        # Try to determine mode from room if possible
-        mode = 'single'  # Default to single
-        try:
-            from multiplayer.models import Room
-            room = Room.objects.filter(quiz=quiz, is_active=True).first()
-            if room:
-                mode = 'multiplayer'
-        except:
-            pass
+        mode = _determine_game_mode(quiz)
         
         GameSession.objects.create(
             user=request.user,
@@ -121,9 +123,15 @@ def take_quiz(request, quiz_id):
         return redirect('quiz_list')
     
     questions_json = json.dumps(questions_list)
+    
+    # Get expected total questions from game session
+    expected_questions = active_session.total_questions if active_session else len(questions_list)
+    
     return render(request, 'take_quiz.html', {
         'quiz': quiz,
-        'questions_json': questions_json
+        'questions_json': questions_json,
+        'expected_questions': expected_questions,
+        'game_session': active_session
     })
 
 @csrf_exempt
@@ -187,15 +195,7 @@ def submit_quiz(request, quiz_id):
         
         if not game_session:
             # Create game session if it doesn't exist (fallback)
-            # Try to determine mode from room if possible
-            mode = 'single'  # Default to single
-            try:
-                from multiplayer.models import Room
-                room = Room.objects.filter(quiz=quiz, is_active=True).first()
-                if room:
-                    mode = 'multiplayer'
-            except:
-                pass
+            mode = _determine_game_mode(quiz)
             
             game_session = GameSession.objects.create(
                 user=request.user,
@@ -259,89 +259,36 @@ def generate_quiz(request):
 
         topic = get_object_or_404(Topic, id=topic_id)
 
-        # Generate quiz title
-        quiz_title = f"AI Generated Quiz - {topic.name} ({difficulty.title()})"
-
-        # Create quiz
-        quiz = Quiz.objects.create(
-            title=quiz_title,
-            description=f"AI-generated quiz on {topic.name} with {num_questions} questions at {difficulty} difficulty.",
-            topic=topic,
-            created_by=request.user,
-            difficulty=difficulty,
-            time_limit=10,  # 10 minutes for generated quizzes
-            is_active=True
-        )
-
-        # Generate questions using AI
+        # Generate quiz progressively using the new service
         try:
-            generator = GeminiQuestionGenerator()
-            questions_data = generator.generate_questions(topic.name, difficulty, num_questions)
+            from quizzes.services import ProgressiveQuizGenerationService
+            quiz_service = ProgressiveQuizGenerationService()
             
-            # Check if questions were generated
-            if not questions_data or len(questions_data) == 0:
-                # Delete the quiz if no questions were generated
-                quiz.delete()
-                from django.contrib import messages
-                messages.error(request, 'Failed to generate questions. Please try again or check your API configuration.')
-                return redirect('home')
-            
-            questions_created = 0
-            for i, q_data in enumerate(questions_data):
-                try:
-                    # Create question
-                    question = Question.objects.create(
-                        quiz=quiz,
-                        question_text=q_data['question'],
-                        question_type='multiple_choice',
-                        correct_answer=q_data['correct_answer'],
-                        options=q_data['options'],
-                        points=1,
-                        is_ai_generated=True  # Mark as AI-generated
-                    )
-
-                    # Create answers
-                    for j, option in enumerate(q_data['options']):
-                        is_correct = (option == q_data['correct_answer'])
-                        Answer.objects.create(
-                            user=request.user,  # This will be updated when user answers
-                            question=question,
-                            answer_text=option,
-                            is_correct=is_correct
-                        )
-                    questions_created += 1
-                except Exception as e:
-                    print(f"Error creating question {i+1}: {e}")
-                    continue
-            
-            # Check if any questions were actually created
-            if questions_created == 0:
-                quiz.delete()
-                from django.contrib import messages
-                messages.error(request, 'Failed to create questions. Please try again.')
-                return redirect('home')
-            
-            # Update quiz with actual number of questions created
-            quiz.refresh_from_db()
-            actual_question_count = quiz.questions.count()
+            # Generate quiz with adaptive initial batch; rest will generate in background
+            quiz = quiz_service.generate_quiz_progressive(
+                topic_id=topic_id,
+                num_questions=num_questions,
+                difficulty=difficulty,
+                user=request.user,
+                initial_timeout=30  # 30 seconds for adaptive batch size
+            )
             
             # Create game session for single player mode
             GameSession.objects.create(
                 user=request.user,
                 quiz=quiz,
                 mode='single',
-                total_questions=actual_question_count
+                total_questions=num_questions  # Use requested count, not current count
             )
             
-            # Redirect to take quiz
+            # Redirect to take quiz immediately with initial questions
             return redirect('take_quiz', quiz_id=quiz.id)
             
         except Exception as e:
-            # If there's an error, delete the quiz and show error message
-            quiz.delete()
+            # If there's an error, show error message
             from django.contrib import messages
             messages.error(request, f'Error generating quiz: {str(e)}. Please try again.')
-            return redirect('home')
+            return redirect('single_player')
 
     # If GET request, redirect to home (shouldn't happen normally)
     return redirect('home')
@@ -434,9 +381,6 @@ def quiz_results(request, quiz_id):
     }
 
     return render(request, 'quiz_results.html', context)
-
-
-
 @login_required
 def single_player(request):
     topics = Topic.objects.all()

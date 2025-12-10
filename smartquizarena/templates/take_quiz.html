@@ -3,53 +3,373 @@
 {% block title %}Taking Quiz - SmartQuiz Arena{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0">{{ quiz.title }}</h4>
-                    <div>
-                        <span class="badge bg-primary me-2">{{ quiz.topic.name }}</span>
-                        <span class="badge bg-secondary">{{ quiz.difficulty }}</span>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <small class="text-muted">
-                        Question <span id="current-question">1</span> of {{ quiz.questions.count }}
-                        | Time Remaining: <span id="time-remaining">{{ quiz.time_limit }}:00</span>
-                        {% if game_session.mode == 'multiplayer' %}
-                        | <span id="answered-count">0/0 players answered</span>
-                        {% endif %}
-                    </small>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="quiz-content">
-                    <!-- Quiz questions will be loaded here via JavaScript -->
-                </div>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-                <div class="d-flex justify-content-between mt-4">
-                    <button id="prev-btn" class="btn btn-secondary" disabled>
-                        <i class="fas fa-arrow-left"></i> Previous
-                    </button>
-                    <button id="next-btn" class="btn btn-primary">
-                        Next <i class="fas fa-arrow-right"></i>
-                    </button>
-                    <button id="submit-btn" class="btn btn-success d-none">
-                        <i class="fas fa-check"></i> Submit Quiz
-                    </button>
-                </div>
+    * {
+        font-family: 'Inter', sans-serif;
+    }
+
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        min-height: 100vh;
+        padding-bottom: 40px;
+    }
+
+    /* Quiz Header */
+    .quiz-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 25px;
+        padding: 30px 40px;
+        margin-bottom: 30px;
+        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
+        animation: fadeInDown 0.6s ease-out;
+    }
+
+    .quiz-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: white;
+        margin-bottom: 15px;
+        text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .quiz-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .quiz-badges .badge {
+        font-size: 0.9rem;
+        padding: 8px 16px;
+        border-radius: 20px;
+        margin-right: 10px;
+        background: rgba(255, 255, 255, 0.25);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        font-weight: 600;
+    }
+
+    .quiz-info {
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+
+    .quiz-info span {
+        font-weight: 700;
+        color: white;
+    }
+
+    #time-remaining {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-weight: 700;
+    }
+
+    @keyframes fadeInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Question Card */
+    .question-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 30px;
+        padding: 45px;
+        box-shadow: 0 25px 70px rgba(0, 0, 0, 0.15);
+        animation: slideInUp 0.6s ease-out;
+        margin-bottom: 30px;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(40px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .question-text {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 35px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        /* Preserve line breaks and spaces for code snippets */
+        word-wrap: break-word;
+        /* Prevent overflow on long lines */
+    }
+
+    /* Answer Options */
+    .answer-option {
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(102, 126, 234, 0.2);
+        border-radius: 20px;
+        padding: 20px 25px;
+        margin-bottom: 15px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .answer-option::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        transition: width 0.3s ease;
+        z-index: 0;
+    }
+
+    .answer-option:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+        border-color: #667eea;
+    }
+
+    .answer-option:hover::before {
+        width: 100%;
+    }
+
+    .answer-option:hover .form-check-label {
+        color: white;
+        position: relative;
+        z-index: 1;
+    }
+
+    .answer-option.selected {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-color: #667eea;
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        transform: scale(1.03);
+    }
+
+    .answer-option.selected .form-check-label {
+        color: white;
+        font-weight: 600;
+    }
+
+    .answer-option .form-check {
+        margin: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .answer-option .form-check-input {
+        width: 22px;
+        height: 22px;
+        margin-top: 2px;
+        cursor: pointer;
+        border: 2px solid #667eea;
+    }
+
+    .answer-option .form-check-input:checked {
+        background-color: white;
+        border-color: white;
+    }
+
+    .answer-option .form-check-label {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #374151;
+        cursor: pointer;
+        margin-left: 10px;
+        transition: all 0.3s ease;
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Progress Bar */
+    .progress-container {
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 15px 25px;
+        margin-bottom: 25px;
+    }
+
+    .progress {
+        height: 12px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.3);
+        overflow: hidden;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .progress-bar {
+        background: linear-gradient(90deg, #10b981, #34d399, #6ee7b7);
+        border-radius: 20px;
+        transition: width 0.5s ease;
+        box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5);
+        animation: progressGlow 2s ease-in-out infinite;
+    }
+
+    @keyframes progressGlow {
+
+        0%,
+        100% {
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5);
+        }
+
+        50% {
+            box-shadow: 0 2px 20px rgba(16, 185, 129, 0.8);
+        }
+    }
+
+    .progress-text {
+        color: white;
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+
+    /* Navigation Buttons */
+    .nav-buttons {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        margin-top: 30px;
+    }
+
+    .btn-nav {
+        border: none;
+        border-radius: 50px;
+        padding: 14px 35px;
+        font-weight: 700;
+        font-size: 1.05rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-nav:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-nav:not(:disabled):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-prev {
+        background: linear-gradient(135deg, #6b7280, #4b5563);
+        color: white;
+    }
+
+    .btn-next {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+    }
+
+    .btn-submit {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .quiz-header {
+            padding: 25px 20px;
+        }
+
+        .quiz-title {
+            font-size: 1.5rem;
+        }
+
+        .question-card {
+            padding: 30px 20px;
+        }
+
+        .question-text {
+            font-size: 1.25rem;
+        }
+
+        .answer-option {
+            padding: 15px 20px;
+        }
+
+        .answer-option .form-check-label {
+            font-size: 1rem;
+        }
+
+        .btn-nav {
+            padding: 12px 25px;
+            font-size: 0.95rem;
+        }
+    }
+</style>
+
+<div class="container mt-4">
+    <!-- Quiz Header -->
+    <div class="quiz-header">
+        <h1 class="quiz-title">{{ quiz.title }}</h1>
+        <div class="quiz-meta">
+            <div class="quiz-badges">
+                <span class="badge">{{ quiz.topic.name }}</span>
+                <span class="badge">{{ quiz.difficulty|title }}</span>
+            </div>
+            <div class="quiz-info">
+                Question <span id="current-question">1</span> of {{ quiz.questions.count }}
+                | Time: <span id="time-remaining">{{ quiz.time_limit }}:00</span>
+                {% if game_session.mode == 'multiplayer' %}
+                | <span id="answered-count">0/0 answered</span>
+                {% endif %}
             </div>
         </div>
     </div>
-</div>
 
-<!-- Progress Bar -->
-<div class="row mt-3">
-    <div class="col-12">
+    <!-- Progress Bar -->
+    <div class="progress-container">
+        <div class="progress-text">Progress</div>
         <div class="progress">
-            <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+            <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Question Card -->
+    <div class="question-card">
+        <div id="quiz-content">
+            <!-- Quiz questions will be loaded here via JavaScript -->
+        </div>
+
+        <div class="nav-buttons">
+            <button id="prev-btn" class="btn btn-nav btn-prev" disabled>
+                <i class="fas fa-arrow-left"></i> Previous
+            </button>
+            <button id="next-btn" class="btn btn-nav btn-next">
+                Next <i class="fas fa-arrow-right"></i>
+            </button>
+            <button id="submit-btn" class="btn btn-nav btn-submit d-none">
+                <i class="fas fa-check"></i> Submit Quiz
+            </button>
         </div>
     </div>
 </div>
@@ -57,26 +377,25 @@
 
 {% block extra_js %}
 <script>
-let currentQuestionIndex = 0;
-let answers = {};
-let timeRemaining = {{ quiz.time_limit }} * 60; // Convert to seconds
-let timer;
-{% if game_session.mode == 'multiplayer' %}
-let socket = null;
-let totalPlayers = 1;
-let answeredCount = 0;
-{% endif %}
+    let currentQuestionIndex = 0;
+    let answers = {};
+    let timeRemaining = {{ quiz.time_limit }} * 60;
+    let timer;
+    {% if game_session.mode == 'multiplayer' %}
+    let socket = null;
+    let totalPlayers = 1;
+    let answeredCount = 0;
+    {% endif %}
 
-const questions = {{ questions_json|safe }};
-{% if game_session.mode == 'multiplayer' %}
-const isMultiplayer = true;
-{% else %}
-const isMultiplayer = false;
-{% endif %}
+    const questions = {{ questions_json| safe }};
+    {% if game_session.mode == 'multiplayer' %}
+    const isMultiplayer = true;
+    {% else %}
+    const isMultiplayer = false;
+    {% endif %}
 
-// Check if questions exist - be very explicit about empty arrays
-if (!questions || !Array.isArray(questions) || questions.length === 0) {
-    document.getElementById('quiz-content').innerHTML = `
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+        document.getElementById('quiz-content').innerHTML = `
         <div class="alert alert-warning text-center">
             <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
             <h5>No Questions Available</h5>
@@ -84,241 +403,225 @@ if (!questions || !Array.isArray(questions) || questions.length === 0) {
             <a href="{% url 'quiz_list' %}" class="btn btn-primary">Back to Quiz List</a>
         </div>
     `;
-    document.getElementById('prev-btn').style.display = 'none';
-    document.getElementById('next-btn').style.display = 'none';
-    document.getElementById('submit-btn').style.display = 'none';
-    // Stop execution here - don't define functions or initialize
-} else if (questions.length > 0) {
-    function displayQuestion(index) {
-        if (index < 0 || index >= questions.length) {
-            return;
+        document.getElementById('prev-btn').style.display = 'none';
+        document.getElementById('next-btn').style.display = 'none';
+        document.getElementById('submit-btn').style.display = 'none';
+    } else if (questions.length > 0) {
+        function escapeHtml(text) {
+            if (!text) return text;
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
-        
-        const question = questions[index];
-        if (!question) {
-            return;
-        }
-        
-        const quizContent = document.getElementById('quiz-content');
 
-        let html = `
-            <h5 class="mb-4">${question.question_text}</h5>
-            <div class="row">
-        `;
+        function displayQuestion(index) {
+            if (index < 0 || index >= questions.length) return;
+            const question = questions[index];
+            if (!question) return;
 
-        if (question.question_type === 'multiple_choice') {
-            question.answers.forEach((answer, i) => {
-                const checked = answers[question.id] === answer.id ? 'checked' : '';
-                html += `
-                    <div class="col-12 mb-2">
+            const quizContent = document.getElementById('quiz-content');
+            let html = `<h5 class="question-text">${escapeHtml(question.question_text)}</h5>`;
+
+            if (question.question_type === 'multiple_choice') {
+                question.answers.forEach((answer, i) => {
+                    const checked = answers[question.id] === answer.id ? 'checked' : '';
+                    const selectedClass = checked ? 'selected' : '';
+                    html += `
+                    <div class="answer-option ${selectedClass}" data-answer-id="${answer.id}">
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="answer" value="${answer.id}" id="answer${i}" ${checked}>
                             <label class="form-check-label" for="answer${i}">
-                                ${answer.answer_text}
+                                ${escapeHtml(answer.answer_text)}
                             </label>
                         </div>
                     </div>
                 `;
-            });
-        } else if (question.question_type === 'true_false') {
-            const trueChecked = answers[question.id] === 'true' ? 'checked' : '';
-            const falseChecked = answers[question.id] === 'false' ? 'checked' : '';
-            html += `
-                <div class="col-6">
+                });
+            } else if (question.question_type === 'true_false') {
+                const trueChecked = answers[question.id] === 'true' ? 'checked' : '';
+                const falseChecked = answers[question.id] === 'false' ? 'checked' : '';
+                const trueSelectedClass = trueChecked ? 'selected' : '';
+                const falseSelectedClass = falseChecked ? 'selected' : '';
+                html += `
+                <div class="answer-option ${trueSelectedClass}" data-answer-value="true">
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="answer" value="true" id="true" ${trueChecked}>
                         <label class="form-check-label" for="true">True</label>
                     </div>
                 </div>
-                <div class="col-6">
+                <div class="answer-option ${falseSelectedClass}" data-answer-value="false">
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="answer" value="false" id="false" ${falseChecked}>
                         <label class="form-check-label" for="false">False</label>
                     </div>
                 </div>
             `;
+            }
+
+            quizContent.innerHTML = html;
+
+            document.querySelectorAll('.answer-option').forEach(option => {
+                option.addEventListener('click', function () {
+                    document.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+                    const radio = this.querySelector('input[type="radio"]');
+                    if (radio) radio.checked = true;
+                });
+            });
+
+            updateNavigation();
+            updateProgress();
         }
 
-        html += '</div>';
-        quizContent.innerHTML = html;
+        // Update navigation button states
+        function updateNavigation() {
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const submitBtn = document.getElementById('submit-btn');
+            prevBtn.disabled = currentQuestionIndex === 0;
+            nextBtn.style.display = currentQuestionIndex === questions.length - 1 ? 'none' : 'inline-block';
+            submitBtn.classList.toggle('d-none', currentQuestionIndex !== questions.length - 1);
+        }
 
-        updateNavigation();
-        updateProgress();
-    }
+        // Update progress bar and question counter
+        function updateProgress() {
+            const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+            document.getElementById('progress-bar').style.width = progress + '%';
+            document.getElementById('current-question').textContent = currentQuestionIndex + 1;
+        }
 
-    function updateNavigation() {
-        const prevBtn = document.getElementById('prev-btn');
-        const nextBtn = document.getElementById('next-btn');
-        const submitBtn = document.getElementById('submit-btn');
+        // Start the quiz timer
+        function startTimer() {
+            timer = setInterval(() => {
+                timeRemaining--;
+                const minutes = Math.floor(timeRemaining / 60);
+                const seconds = timeRemaining % 60;
+                document.getElementById('time-remaining').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                if (timeRemaining <= 0) {
+                    clearInterval(timer);
+                    submitQuiz();
+                }
+            }, 1000);
+        }
 
-        prevBtn.disabled = currentQuestionIndex === 0;
-        nextBtn.style.display = currentQuestionIndex === questions.length - 1 ? 'none' : 'inline-block';
-        submitBtn.classList.toggle('d-none', currentQuestionIndex !== questions.length - 1);
-    }
+        // Submit quiz to server
+        function submitQuiz() {
+            clearInterval(timer);
+            const radios = document.querySelectorAll('input[name="answer"]:checked');
+            radios.forEach(radio => {
+                const questionId = questions[currentQuestionIndex].id;
+                answers[questionId] = radio.value;
+            });
 
-    function updateProgress() {
-        const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
-        document.getElementById('progress-bar').style.width = progress + '%';
-        document.getElementById('current-question').textContent = currentQuestionIndex + 1;
-    }
+            fetch('{% url "submit_quiz" quiz.id %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ answers: answers })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert('Error submitting quiz. Please try again.');
+                    }
+                });
+        }
 
-    function startTimer() {
-        timer = setInterval(() => {
-            timeRemaining--;
-            const minutes = Math.floor(timeRemaining / 60);
-            const seconds = timeRemaining % 60;
-            document.getElementById('time-remaining').textContent =
-                `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-            if (timeRemaining <= 0) {
-                clearInterval(timer);
-                submitQuiz();
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            if (currentQuestionIndex > 0) {
+                const radios = document.querySelectorAll('input[name="answer"]:checked');
+                if (radios.length > 0) {
+                    answers[questions[currentQuestionIndex].id] = radios[0].value;
+                }
+                currentQuestionIndex--;
+                displayQuestion(currentQuestionIndex);
             }
-        }, 1000);
-    }
-
-    function submitQuiz() {
-        clearInterval(timer);
-
-        // Collect final answers
-        const radios = document.querySelectorAll('input[name="answer"]:checked');
-        radios.forEach(radio => {
-            const questionId = questions[currentQuestionIndex].id;
-            answers[questionId] = radio.value;
         });
 
-        // Submit answers via AJAX
-        fetch('{% url "submit_quiz" quiz.id %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({ answers: answers })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.location.href = data.redirect_url;
-            } else {
-                alert('Error submitting quiz. Please try again.');
-            }
-        });
-    }
-
-    // Event listeners
-    document.getElementById('prev-btn').addEventListener('click', () => {
-        if (currentQuestionIndex > 0) {
-            // Save current answer
+        document.getElementById('next-btn').addEventListener('click', () => {
             const radios = document.querySelectorAll('input[name="answer"]:checked');
             if (radios.length > 0) {
                 answers[questions[currentQuestionIndex].id] = radios[0].value;
             }
+            if (isMultiplayer) {
+                submitCurrentAnswer();
+            } else {
+                if (currentQuestionIndex < questions.length - 1) {
+                    currentQuestionIndex++;
+                    displayQuestion(currentQuestionIndex);
+                }
+            }
+        });
 
-            currentQuestionIndex--;
-            displayQuestion(currentQuestionIndex);
+        document.getElementById('submit-btn').addEventListener('click', submitQuiz);
+
+        if (questions && questions.length > 0) {
+            displayQuestion(0);
+            startTimer();
         }
-    });
+    }
 
-    document.getElementById('next-btn').addEventListener('click', () => {
-        // Save current answer
+    function initWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/quiz/{{ quiz.id }}/`;
+        socket = new WebSocket(wsUrl);
+        socket.onopen = () => console.log('Connected to quiz websocket');
+        socket.onmessage = (event) => handleWebSocketMessage(JSON.parse(event.data));
+        socket.onclose = () => console.log('Disconnected from quiz websocket');
+        socket.onerror = (error) => console.error('WebSocket error:', error);
+    }
+
+    function handleWebSocketMessage(data) {
+        switch (data.type) {
+            case 'quiz_start':
+                totalPlayers = data.total_players;
+                updateAnsweredCount(0, totalPlayers);
+                break;
+            case 'player_answered':
+                answeredCount = data.answered_count;
+                updateAnsweredCount(answeredCount, data.total_players);
+                break;
+            case 'next_question':
+                currentQuestionIndex = data.question_index;
+                timeRemaining = data.time_remaining;
+                answeredCount = 0;
+                updateAnsweredCount(0, totalPlayers);
+                displayQuestion(currentQuestionIndex);
+                break;
+            case 'quiz_finished':
+                alert(data.message);
+                window.location.href = '{% url "quiz_results" quiz.id %}';
+                break;
+            case 'error':
+                alert(data.message);
+                break;
+        }
+    }
+
+    function submitCurrentAnswer() {
         const radios = document.querySelectorAll('input[name="answer"]:checked');
         if (radios.length > 0) {
-            answers[questions[currentQuestionIndex].id] = radios[0].value;
+            socket.send(JSON.stringify({
+                'type': 'submit_answer',
+                'question_index': currentQuestionIndex,
+                'answer': radios[0].value
+            }));
         }
-
-        if (isMultiplayer) {
-            // In multiplayer mode, submit answer and wait for all players
-            submitCurrentAnswer();
-        } else {
-            // In single player mode, proceed to next question
-            if (currentQuestionIndex < questions.length - 1) {
-                currentQuestionIndex++;
-                displayQuestion(currentQuestionIndex);
-            }
-        }
-    });
-
-    document.getElementById('submit-btn').addEventListener('click', submitQuiz);
-
-    // Initialize only if we have questions
-    if (questions && questions.length > 0) {
-        displayQuestion(0);
-        startTimer();
     }
-}
 
-// Multiplayer-specific functions
-function initWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/quiz/{{ quiz.id }}/`;
-
-    socket = new WebSocket(wsUrl);
-
-    socket.onopen = function(event) {
-        console.log('Connected to quiz websocket');
-    };
-
-    socket.onmessage = function(event) {
-        const data = JSON.parse(event.data);
-        handleWebSocketMessage(data);
-    };
-
-    socket.onclose = function(event) {
-        console.log('Disconnected from quiz websocket');
-    };
-
-    socket.onerror = function(error) {
-        console.error('WebSocket error:', error);
-    };
-}
-
-function handleWebSocketMessage(data) {
-    switch(data.type) {
-        case 'quiz_start':
-            totalPlayers = data.total_players;
-            updateAnsweredCount(0, totalPlayers);
-            break;
-        case 'player_answered':
-            answeredCount = data.answered_count;
-            updateAnsweredCount(answeredCount, data.total_players);
-            break;
-        case 'next_question':
-            currentQuestionIndex = data.question_index;
-            timeRemaining = data.time_remaining;
-            answeredCount = 0;
-            updateAnsweredCount(0, totalPlayers);
-            displayQuestion(currentQuestionIndex);
-            break;
-        case 'quiz_finished':
-            alert(data.message);
-            window.location.href = '{% url "quiz_results" quiz.id %}';
-            break;
-        case 'error':
-            alert(data.message);
-            break;
+    function updateAnsweredCount(count, total) {
+        document.getElementById('answered-count').textContent = `${count}/${total} players answered`;
     }
-}
 
-function submitCurrentAnswer() {
-    const radios = document.querySelectorAll('input[name="answer"]:checked');
-    if (radios.length > 0) {
-        const answer = radios[0].value;
-        socket.send(JSON.stringify({
-            'type': 'submit_answer',
-            'question_index': currentQuestionIndex,
-            'answer': answer
-        }));
+    if (isMultiplayer) {
+        initWebSocket();
     }
-}
-
-function updateAnsweredCount(count, total) {
-    document.getElementById('answered-count').textContent = `${count}/${total} players answered`;
-}
-
-// Initialize WebSocket for multiplayer if in multiplayer mode
-if (isMultiplayer) {
-    initWebSocket();
-}
 </script>
 {% endblock %}

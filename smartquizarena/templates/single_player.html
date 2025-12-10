@@ -3,52 +3,111 @@
 {% block title %}Single Player - SmartQuiz Arena{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12 text-center mb-5">
-        <h1 class="display-4 fw-bold text-primary">Single Player Quiz</h1>
+<style>
+    .config-wrapper {
+        min-height: calc(100vh - 250px);
+    }
+
+    .hero-section {
+        text-align: center;
+        padding: 3rem 0;
+        margin-bottom: 2rem;
+    }
+
+    .config-card {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .form-icon {
+        position: relative;
+    }
+
+    .form-icon i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #667eea;
+        z-index: 10;
+    }
+
+    .form-icon select {
+        padding-left: 2.75rem;
+    }
+</style>
+
+<div class="config-wrapper animate-fade-in">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <h1 class="display-4 fw-bold gradient-text mb-3">Single Player Quiz</h1>
         <p class="lead text-muted">Test your knowledge with personalized quizzes and track your progress.</p>
     </div>
-</div>
 
-<div class="row justify-content-center">
-    <div class="col-md-6">
+    <!-- Messages Display -->
+    {% if messages %}
+    <div class="container mb-4" style="max-width: 600px;">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            <i
+                class="fas fa-{% if message.tags == 'error' %}exclamation-circle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Configuration Card -->
+    <div class="config-card">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Start Single Player Quiz</h5>
+                <h4 class="mb-0 text-white"><i class="fas fa-cog me-2"></i>Configure Your Quiz</h4>
             </div>
-            <div class="card-body">
+            <div class="card-body p-4">
                 <form id="singlePlayerForm" method="post" action="{% url 'generate_quiz' %}">
                     {% csrf_token %}
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label for="topic" class="form-label">Topic</label>
-                        <select class="form-select" id="topic" name="topic" required>
-                            <option value="">Select a topic</option>
-                            {% for topic in topics %}
-                            {% if not topic.name == "Test" %}
-                            <option value="{{ topic.id }}">{{ topic.name }}</option>
-                            {% endif %}
-                            {% endfor %}
-                        </select>
+                        <div class="form-icon">
+                            <i class="fas fa-book"></i>
+                            <select class="form-select" id="topic" name="topic" required>
+                                <option value="">Select a topic</option>
+                                {% for topic in topics %}
+                                {% if not topic.name == "Test" %}
+                                <option value="{{ topic.id }}">{{ topic.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label for="difficulty" class="form-label">Difficulty Level</label>
-                        <select class="form-select" id="difficulty" name="difficulty" required>
-                            <option value="easy">Easy</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="hard">Hard</option>
-                        </select>
+                        <div class="form-icon">
+                            <i class="fas fa-signal"></i>
+                            <select class="form-select" id="difficulty" name="difficulty" required>
+                                <option value="easy">Easy</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="hard">Hard</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label for="num_questions" class="form-label">Number of Questions</label>
-                        <select class="form-select" id="num_questions" name="num_questions" required>
-                            <option value="5">5 Questions</option>
-                            <option value="10" selected>10 Questions</option>
-                            <option value="15">15 Questions</option>
-                            <option value="20">20 Questions</option>
-                        </select>
+                        <div class="form-icon">
+                            <i class="fas fa-list-ol"></i>
+                            <select class="form-select" id="num_questions" name="num_questions" required>
+                                <option value="5">5 Questions</option>
+                                <option value="10" selected>10 Questions</option>
+                                <option value="15">15 Questions</option>
+                                <option value="20">20 Questions</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Generate Quiz</button>
+                        <button type="submit" class="btn btn-primary py-3">
+                            <i class="fas fa-play-circle me-2"></i>Generate Quiz
+                        </button>
                     </div>
                 </form>
             </div>
@@ -59,15 +118,15 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('singlePlayerForm');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-        });
-    }
-});
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('singlePlayerForm');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+            });
+        }
+    });
 </script>
 {% endblock %}

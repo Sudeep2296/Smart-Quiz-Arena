@@ -404,8 +404,13 @@ class CodeBattleConsumer(AsyncWebsocketConsumer):
 
     async def handle_submit_code(self, user, data):
         code = data.get('code')
+        # Allow empty code if it's a timeout signal
+        is_timeout = data.get('is_timeout', False)
+        if is_timeout and code is None:
+            code = "" 
+            
         language = data.get('language')
-        if not code or not language:
+        if code is None or not language:
             await self.send(json.dumps({"type": "error", "message": "Code and language required"}))
             return
 
@@ -440,6 +445,11 @@ class CodeBattleConsumer(AsyncWebsocketConsumer):
             status = 'wrong_answer'
         print(f"Status determined: {status}")
         print(f"Passed: {result['passed']}/{result['total']}")
+
+        # Override status if it was a timeout and didn't pass
+        if is_timeout and status != 'accepted':
+            status = 'time_limit'
+            print(f"Submission flagged as timeout. Forced status to: {status}")
 
         # Create submission with results
         submission = await self.create_submission_with_results(user, self.battle_id, current_challenge, code, language, status, result)
@@ -519,6 +529,11 @@ class CodeBattleConsumer(AsyncWebsocketConsumer):
                 print(f"❌ User {user.username} is not the first winner")
         else:
             print(f"Status is not 'accepted', skipping winner check")
+            # Check if all players have finished (e.g. both timed out)
+            should_progress = await self.check_if_all_players_finished(self.battle_id, battle_data['current_challenge_index'])
+            if should_progress:
+                print(f"⌛ All players finished (or timed out). Scheduling auto-progression...")
+                asyncio.create_task(self.auto_progress_question(self.battle_id, battle_data['current_challenge_index']))
 
         
     async def handle_start_battle(self, user, data):
@@ -1020,7 +1035,7 @@ class CodeBattleConsumer(AsyncWebsocketConsumer):
         battle.save()
         return True
 
-    async def auto_progress_question(self, battle_id):
+    async def auto_progress_question(self, battle_id, expected_index=None):
         """
         Automatically progress to the next question after a delay.
         Called after a winner is determined for the current question.
@@ -1029,7 +1044,7 @@ class CodeBattleConsumer(AsyncWebsocketConsumer):
         await asyncio.sleep(5)
         
         # Advance to next question
-        has_more_questions = await self.advance_to_next_question(battle_id)
+        has_more_questions = await self.advance_to_next_question(battle_id, expected_index)
         
         if has_more_questions:
             # Broadcast next challenge event
@@ -1091,12 +1106,21 @@ class CodeBattleConsumer(AsyncWebsocketConsumer):
             )
 
     @database_sync_to_async
-    def advance_to_next_question(self, battle_id):
+    def advance_to_next_question(self, battle_id, expected_index=None):
         """
         Increment the current challenge index.
         Returns True if there are more questions, False if all completed.
+        If expected_index is provided, only increment if it matches current index (optimistic locking).
         """
         battle = Battle.objects.get(id=battle_id)
+        
+        # Optimistic locking check
+        if expected_index is not None and battle.current_challenge_index != expected_index:
+            print(f"Skipping advance: Current index {battle.current_challenge_index} != Expected {expected_index}")
+            # verify if we are still within bounds or finished
+            total_questions = battle.challenges.count()
+            return battle.current_challenge_index < total_questions
+
         total_questions = battle.challenges.count()
         
         # Increment current challenge index
@@ -1105,3 +1129,34 @@ class CodeBattleConsumer(AsyncWebsocketConsumer):
         
         # Check if there are more questions
         return battle.current_challenge_index < total_questions
+
+    @database_sync_to_async
+    def check_if_all_players_finished(self, battle_id, challenge_index):
+        """
+        Check if all players in the battle have either solved the question (accepted)
+        or timed out (time_limit) for the current challenge.
+        """
+        battle = Battle.objects.get(id=battle_id)
+        challenges = battle.challenges.all()
+        if challenge_index >= len(challenges):
+            return True # Already done
+            
+        current_challenge = challenges[challenge_index]
+        
+        players = [battle.player1]
+        if battle.player2:
+            players.append(battle.player2)
+            
+        finished_count = 0
+        for player in players:
+            # Check if player has a finishing submission for this challenge
+            has_finished = Submission.objects.filter(
+                user=player, 
+                challenge=current_challenge,
+                status__in=['accepted', 'time_limit']
+            ).exists()
+            
+            if has_finished:
+                finished_count += 1
+                
+        return finished_count == len(players)
