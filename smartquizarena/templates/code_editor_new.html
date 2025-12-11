@@ -92,7 +92,7 @@
 <script>
     const battleCode = "{{ battle.battle_code }}";
     const userId = {{ user.id }};
-    const isHost = {{ is_host| yesno: "true,false" }};
+    const isHost = {{ is_host|yesno:"true,false" }};
     let socket;
 
     function connectWebSocket() {
