@@ -165,6 +165,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
+# CSRF settings for production
+CSRF_TRUSTED_ORIGINS = [
+    "https://smart-quiz-arena-production.up.railway.app",
+    "https://smart-quiz-arena.up.railway.app",
+]
+
 # Gemini AI API Key (set in environment variables)
 GEMINI_API_KEY = config('GEMINI_API_KEY')
 
